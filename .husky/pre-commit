@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged
+npx lint-staged
+
+# Run type checking
+echo "🔍 Type checking..."
+npm run typecheck
+
+if [ $? -ne 0 ]; then
+  echo "❌ Type checking failed. Please fix the errors before committing."
+  exit 1
+fi
+
+echo "✅ Pre-commit checks passed!" 

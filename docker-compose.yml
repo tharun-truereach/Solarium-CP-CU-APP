@@ -1,0 +1,47 @@
+# Docker Compose configuration for Solarium Web Portal
+# Supports different environments
+
+version: '3.8'
+
+services:
+  webprt:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: production
+    ports:
+      - '${PORT:-3000}:80'
+    environment:
+      - REACT_APP_ENVIRONMENT=${REACT_APP_ENVIRONMENT:-PRODUCTION}
+      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-https://api.solarium.com}
+      - REACT_APP_SESSION_TIMEOUT_MIN=${REACT_APP_SESSION_TIMEOUT_MIN:-30}
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:80/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service
+  webprt-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: builder
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_ENVIRONMENT=DEVELOPMENT
+      - REACT_APP_API_BASE_URL=http://localhost:3001
+      - REACT_APP_SESSION_TIMEOUT_MIN=60
+    command: npm run dev
+    profiles:
+      - dev
+
+networks:
+  default:
+    name: solarium-network

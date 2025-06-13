@@ -1,0 +1,64 @@
+/**
+ * Styles for Feature Error Boundary component
+ */
+
+.feature-error-boundary {
+  padding: 24px;
+  background-color: #fff8e1;
+  border: 1px solid #ffd54f;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.feature-error-boundary__content {
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.feature-error-boundary__icon {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.feature-error-boundary__title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #f57c00;
+  margin-bottom: 8px;
+}
+
+.feature-error-boundary__message {
+  color: #e65100;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.feature-error-boundary__error-id {
+  font-size: 0.85rem;
+  color: #bf360c;
+  margin-bottom: 16px;
+}
+
+.feature-error-boundary__error-id code {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  background-color: #fff3e0;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.feature-error-boundary__retry {
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.feature-error-boundary__retry:hover {
+  background-color: #f57c00;
+}

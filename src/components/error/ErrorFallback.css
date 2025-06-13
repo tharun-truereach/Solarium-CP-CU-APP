@@ -1,0 +1,185 @@
+/**
+ * Styles for Error Fallback UI component
+ */
+
+.error-fallback {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  padding: 20px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.error-fallback__container {
+  max-width: 600px;
+  width: 100%;
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.error-fallback__icon {
+  font-size: 4rem;
+  margin-bottom: 24px;
+}
+
+.error-fallback__title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: #dc3545;
+  margin-bottom: 16px;
+}
+
+.error-fallback__subtitle {
+  font-size: 1.2rem;
+  color: #6c757d;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.error-fallback__error-id {
+  font-size: 0.9rem;
+  color: #495057;
+  margin-bottom: 32px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.error-fallback__error-id code {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-weight: 600;
+  color: #007bff;
+}
+
+.error-fallback__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.error-fallback__button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.error-fallback__button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.error-fallback__button--primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.error-fallback__button--primary:hover {
+  background-color: #0056b3;
+}
+
+.error-fallback__button--secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.error-fallback__button--secondary:hover {
+  background-color: #545b62;
+}
+
+.error-fallback__button--tertiary {
+  background-color: transparent;
+  color: #007bff;
+  border: 2px solid #007bff;
+}
+
+.error-fallback__button--tertiary:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.error-fallback__details {
+  text-align: left;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.error-fallback__details-summary {
+  padding: 16px;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.error-fallback__details-summary:hover {
+  background-color: #e9ecef;
+}
+
+.error-fallback__technical {
+  padding: 20px;
+}
+
+.error-fallback__technical h3 {
+  margin-top: 20px;
+  margin-bottom: 8px;
+  color: #495057;
+  font-size: 1.1rem;
+}
+
+.error-fallback__technical h3:first-child {
+  margin-top: 0;
+}
+
+.error-fallback__code {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #e83e8c;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .error-fallback {
+    padding: 12px;
+  }
+
+  .error-fallback__container {
+    padding: 24px;
+  }
+
+  .error-fallback__title {
+    font-size: 2rem;
+  }
+
+  .error-fallback__actions {
+    flex-direction: column;
+  }
+
+  .error-fallback__button {
+    width: 100%;
+  }
+}
