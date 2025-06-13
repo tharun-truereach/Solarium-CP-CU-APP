@@ -4,17 +4,17 @@
 echo "🔍 Running pre-push checks..."
 
 # Run tests
-echo "🧪 Running tests..."
-# npm run test:ci
+echo "�� Running tests..."
+npm run test:ci
 
 if [ $? -ne 0 ]; then
   echo "❌ Tests failed. Please fix the failing tests before pushing."
   exit 1
 fi
 
-# Run build to make sure it compiles
+# Test the production build
 echo "🏗️ Testing build..."
-npm run build:production
+npm run build:prod
 
 if [ $? -ne 0 ]; then
   echo "❌ Build failed. Please fix the build errors before pushing."
