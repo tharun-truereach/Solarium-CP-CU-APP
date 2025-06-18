@@ -3,6 +3,10 @@
  * Re-exports all service modules for easy importing
  */
 
+// HTTP Client Services
+export * from './http/axiosClient';
+export * from './http/circuitBreaker';
+
 // API Services (to be implemented in future tasks)
 // export * from './api';
 // export * from './auth';

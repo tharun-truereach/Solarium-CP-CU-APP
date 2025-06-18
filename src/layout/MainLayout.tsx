@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import GlobalErrorToast from '../components/GlobalErrorToast';
 
 const DRAWER_WIDTH = 280;
 const DRAWER_WIDTH_COLLAPSED = 60;
@@ -173,6 +174,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </Container>
         </Box>
       </Box>
+
+      {/* Global Error Toast */}
+      <GlobalErrorToast />
     </Box>
   );
 };

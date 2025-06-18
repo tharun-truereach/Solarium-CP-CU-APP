@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DataLoader } from '../components/loading';
 import { AppCard, AppButton } from '../components/ui';
 import { useLoadingState } from '../hooks/useLoadingState';
+import ErrorTestComponent from '../components/ErrorTestComponent';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -73,10 +74,11 @@ const Dashboard: React.FC = () => {
 
   return (
     <Box className="dashboard-page" component="main">
+      <ErrorTestComponent />
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography component="h1" variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-          Welcome back, {user?.name}!
+          Welcome back, {user?.firstName} {user?.lastName}!
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Here&apos;s what&apos;s happening with your{' '}

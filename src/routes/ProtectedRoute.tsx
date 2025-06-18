@@ -5,51 +5,41 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ROUTES } from './routes';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: string[];
+  requiredRoles?: string[];
   redirectTo?: string;
+  checkPermission?: (user: any, pathname: string) => boolean;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
-  allowedRoles,
-  redirectTo,
+  requiredRoles = [],
+  redirectTo = '/login',
+  checkPermission,
 }) => {
-  const { isAuthenticated, isLoading, checkPermission } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const location = useLocation();
 
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Checking authentication...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect to login if not authenticated
+  // If not authenticated, redirect to login
   if (!isAuthenticated) {
-    return (
-      <Navigate
-        to={redirectTo || ROUTES.LOGIN}
-        state={{ from: location }}
-        replace
-      />
-    );
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // Check role-based permissions
-  if (allowedRoles && !checkPermission(allowedRoles)) {
-    return <Navigate to={ROUTES.ACCESS_DENIED} replace />;
+  // If specific roles are required, check user role
+  if (requiredRoles.length > 0 && user) {
+    const hasRequiredRole = requiredRoles.includes(user.role);
+    if (!hasRequiredRole) {
+      return <Navigate to="/access-denied" replace />;
+    }
   }
 
-  // User is authenticated and authorized
+  // Check additional permissions if checkPermission function is provided
+  if (checkPermission && !checkPermission(user, location.pathname)) {
+    return <Navigate to="/access-denied" replace />;
+  }
+
   return <>{children}</>;
 };
 

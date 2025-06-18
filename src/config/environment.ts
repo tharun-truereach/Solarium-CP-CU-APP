@@ -14,6 +14,7 @@ export interface EnvironmentConfig {
   // Session Configuration
   sessionTimeoutMinutes: number;
   sessionWarningMinutes: number;
+  cryptoSecret: string;
 
   // Feature Flags
   enableDebugTools: boolean;
@@ -102,7 +103,7 @@ export const config: EnvironmentConfig = {
     | 'PROD',
 
   // API Configuration
-  apiBaseUrl: getEnvVar('REACT_APP_API_BASE_URL', 'http://localhost:3001'),
+  apiBaseUrl: getEnvVar('REACT_APP_API_BASE_URL', 'http://localhost:3000'),
   apiTimeout: getEnvVar('REACT_APP_API_TIMEOUT', 30000, toNumber),
 
   // Session Configuration
@@ -115,6 +116,10 @@ export const config: EnvironmentConfig = {
     'REACT_APP_SESSION_WARNING_MIN',
     5,
     toNumber
+  ),
+  cryptoSecret: getEnvVar(
+    'VITE_CRYPTO_SECRET',
+    'fallback-secret-key-for-development-only-32chars'
   ),
 
   // Feature Flags

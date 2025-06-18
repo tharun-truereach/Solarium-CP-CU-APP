@@ -61,7 +61,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.DASHBOARD}
           element={
-            <ProtectedRoute allowedRoles={['admin', 'kam']}>
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
               <MainLayout>
                 <Dashboard />
               </MainLayout>
@@ -73,7 +73,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path="/lazy-example"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'kam']}>
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
               <MainLayout>{withSuspense(LazyExample)()}</MainLayout>
             </ProtectedRoute>
           }
@@ -83,7 +83,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.LEADS}
           element={
-            <ProtectedRoute allowedRoles={['admin', 'kam']}>
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>Leads Management</h1>
@@ -97,7 +97,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.QUOTATIONS}
           element={
-            <ProtectedRoute allowedRoles={['admin', 'kam']}>
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>Quotations</h1>
@@ -111,7 +111,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.CHANNEL_PARTNERS}
           element={
-            <ProtectedRoute allowedRoles={['admin', 'kam']}>
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>Channel Partners</h1>
@@ -125,7 +125,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.CUSTOMERS}
           element={
-            <ProtectedRoute allowedRoles={['admin', 'kam']}>
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>Customers</h1>
@@ -140,7 +140,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.COMMISSIONS}
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute requiredRoles={['admin']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>Commissions</h1>
@@ -156,7 +156,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.MASTER_DATA}
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute requiredRoles={['admin']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>Master Data Management</h1>
@@ -172,7 +172,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path={ROUTES.SETTINGS}
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute requiredRoles={['admin']}>
               <MainLayout>
                 <div className="placeholder-page">
                   <h1>System Settings</h1>
