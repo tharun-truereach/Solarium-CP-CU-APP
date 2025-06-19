@@ -8,10 +8,9 @@ module.exports = {
   },
   extends: [
     'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:react/recommended',
-    'plugin:react/jsx-runtime',
+    '@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
+    'plugin:security/recommended',
   ],
   ignorePatterns: [
     'dist',
@@ -30,38 +29,146 @@ module.exports = {
     },
     project: './tsconfig.json',
   },
-  plugins: ['react', 'react-hooks', 'react-refresh', '@typescript-eslint'],
+  plugins: ['react-refresh', 'security'],
   rules: {
-    // React specific rules
-    'react/prop-types': 'off',
-    'react/react-in-jsx-scope': 'off',
-    'react/jsx-uses-react': 'off',
     'react-refresh/only-export-components': [
       'warn',
       { allowConstantExport: true },
     ],
-    'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn',
 
-    // TypeScript specific rules
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/explicit-function-return-type': 'off',
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    // Security rules
+    'security/detect-object-injection': 'error',
+    'security/detect-non-literal-regexp': 'error',
+    'security/detect-non-literal-fs-filename': 'error',
+    'security/detect-eval-with-expression': 'error',
+    'security/detect-pseudoRandomBytes': 'error',
+    'security/detect-possible-timing-attacks': 'warn',
+    'security/detect-unsafe-regex': 'error',
+    'security/detect-buffer-noassert': 'error',
+    'security/detect-child-process': 'error',
+    'security/detect-disable-mustache-escape': 'error',
+    'security/detect-no-csrf-before-method-override': 'error',
+
+    // Prevent dangerous HTML injection
+    'react/no-danger': 'error',
+    'react/no-danger-with-children': 'error',
+
+    // Prevent XSS through dangerouslySetInnerHTML
+    'no-restricted-properties': [
+      'error',
+      {
+        object: 'React',
+        property: 'dangerouslySetInnerHTML',
+        message:
+          'dangerouslySetInnerHTML is not allowed for security reasons. Use safe alternatives.',
+      },
+      {
+        property: 'dangerouslySetInnerHTML',
+        message:
+          'dangerouslySetInnerHTML is not allowed for security reasons. Use safe alternatives.',
+      },
+      {
+        object: 'window',
+        property: 'eval',
+        message: 'eval() is not allowed for security reasons.',
+      },
+      {
+        object: 'global',
+        property: 'eval',
+        message: 'eval() is not allowed for security reasons.',
+      },
+      {
+        object: 'window',
+        property: 'Function',
+        message: 'Function constructor is not allowed for security reasons.',
+      },
+    ],
+
+    // Prevent token exposure
+    'no-restricted-globals': [
+      'error',
+      {
+        name: 'localStorage',
+        message:
+          'Direct localStorage access is restricted. Use the secure storage utilities instead.',
+      },
+      {
+        name: 'sessionStorage',
+        message:
+          'Direct sessionStorage access is restricted. Use the secure storage utilities instead.',
+      },
+    ],
+
+    // Prevent console.log in production
+    'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
+
+    // Prevent debugger statements
+    'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
+
+    // Prevent alert/confirm/prompt
+    'no-alert': 'error',
+
+    // Prevent with statements
+    'no-with': 'error',
+
+    // Prevent eval and eval-like functions
+    'no-eval': 'error',
+    'no-implied-eval': 'error',
+    'no-new-func': 'error',
+
+    // Prevent script injection
+    'no-script-url': 'error',
+
+    // TypeScript specific security rules
     '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-non-null-assertion': 'error',
+    '@typescript-eslint/no-unsafe-assignment': 'error',
+    '@typescript-eslint/no-unsafe-call': 'error',
+    '@typescript-eslint/no-unsafe-member-access': 'error',
+    '@typescript-eslint/no-unsafe-return': 'error',
 
-    // General code quality rules
-    'no-console': ['warn', { allow: ['warn', 'error'] }],
-    'no-debugger': 'error',
-    'prefer-const': 'error',
-    'no-var': 'error',
-    'object-shorthand': 'error',
+    // Prevent prototype pollution
+    'no-prototype-builtins': 'error',
 
-    // Import/Export rules
-    'no-duplicate-imports': 'error',
+    // Prevent RegExp DoS
+    'no-invalid-regexp': 'error',
+
+    // Prevent potential XSS in URLs
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: 'Literal[value=/^(javascript|data|vbscript):/i]',
+        message:
+          'Potential XSS: javascript:, data:, and vbscript: URLs are not allowed',
+      },
+      {
+        selector: 'TemplateElement[value.raw=/^(javascript|data|vbscript):/i]',
+        message:
+          'Potential XSS: javascript:, data:, and vbscript: URLs are not allowed in template literals',
+      },
+    ],
   },
   settings: {
     react: {
       version: 'detect',
     },
   },
+  overrides: [
+    {
+      files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
+      rules: {
+        // Relax some rules for test files
+        'no-console': 'off',
+        'security/detect-object-injection': 'off',
+        '@typescript-eslint/no-explicit-any': 'off',
+      },
+    },
+    {
+      files: ['src/store/persistence/encryptedTransform.ts'],
+      rules: {
+        // Allow controlled localStorage usage in secure storage utilities
+        'no-restricted-globals': 'off',
+      },
+    },
+  ],
 };

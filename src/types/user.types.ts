@@ -1,6 +1,6 @@
 /**
  * User type definitions for Solarium Web Portal
- * Defines user-related interfaces and types
+ * Defines user-related interfaces and types with territory support
  */
 
 /**
@@ -32,7 +32,21 @@ export type Permission =
   | 'settings:write';
 
 /**
- * User profile interface
+ * Territory types
+ */
+export type Territory =
+  | 'North'
+  | 'South'
+  | 'East'
+  | 'West'
+  | 'Central'
+  | 'Northeast'
+  | 'Northwest'
+  | 'Southeast'
+  | 'Southwest';
+
+/**
+ * User profile interface with territory support
  */
 export interface User {
   id: string;
@@ -47,9 +61,9 @@ export interface User {
   phoneNumber?: string;
   avatar?: string;
 
-  // Work information
+  // Work information with territory support
   department?: string;
-  territory?: string;
+  territories: Territory[]; // Array of assigned territories
   manager?: string;
 
   // Account status
@@ -93,7 +107,7 @@ export interface RefreshTokenResponse {
 }
 
 /**
- * User creation/update payload
+ * User creation/update payload with territory support
  */
 export interface UserPayload {
   email: string;
@@ -103,7 +117,7 @@ export interface UserPayload {
   lastName?: string;
   phoneNumber?: string;
   department?: string;
-  territory?: string;
+  territories?: Territory[]; // Array of assigned territories
   permissions?: Permission[];
   isActive?: boolean;
 }
@@ -131,14 +145,14 @@ export interface ProfileUpdatePayload {
 }
 
 /**
- * User list query parameters
+ * User list query parameters with territory filtering
  */
 export interface UserListQuery {
   page?: number;
   limit?: number;
   search?: string;
   role?: UserRole;
-  territory?: string;
+  territories?: Territory[];
   isActive?: boolean;
   sortBy?: 'name' | 'email' | 'role' | 'createdAt' | 'lastLoginAt';
   sortOrder?: 'asc' | 'desc';
@@ -153,4 +167,34 @@ export interface UserListResponse {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+/**
+ * Territory access interface for data filtering
+ */
+export interface TerritoryAccess {
+  territories: Territory[];
+  hasFullAccess: boolean; // Admin has access to all territories
+  canAccessTerritory: (territory: Territory) => boolean;
+}
+
+/**
+ * Territory-filtered query parameters for data APIs
+ */
+export interface TerritoryFilteredQuery {
+  territories?: Territory[];
+  territoryFilter?: 'include' | 'exclude';
+}
+
+/**
+ * Extended data query with territory filtering
+ */
+export interface DataQueryWithTerritory extends TerritoryFilteredQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  dateFrom?: string;
+  dateTo?: string;
 }

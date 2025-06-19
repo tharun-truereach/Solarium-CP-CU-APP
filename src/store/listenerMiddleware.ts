@@ -1,87 +1,171 @@
 /**
- * Redux Toolkit Listener Middleware configuration
- * Handles side effects and cross-slice logic for the Solarium Web Portal
+ * Redux Toolkit Listener Middleware
+ * Handles cross-cutting concerns like session management and error handling
  */
+import { createListenerMiddleware, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from './store';
 
-import { createListenerMiddleware, addListener } from '@reduxjs/toolkit';
-import { config } from '../config/environment';
+// Import actions that we'll listen for
+import { login, logout, setError as setAuthError } from './slices/authSlice';
+import { showToast } from './slices/uiSlice';
 
 /**
- * Create listener middleware instance with proper typing
+ * Create typed listener middleware
  */
-export const listenerMiddleware = createListenerMiddleware({
-  // Optional configuration
-  onError: (error, _listenerApi) => {
-    console.error('🎧 Listener middleware error:', error);
+export const listenerMiddleware = createListenerMiddleware();
 
-    // In development, provide more detailed error information
-    if (config.environment === 'DEV') {
-      console.error('🎧 Listener error details:', {
-        error,
-        // action: listenerApi.getOriginalState(),
-        // state: listenerApi.getState(),
+/**
+ * Session management listeners
+ */
+
+// Listen for successful login
+listenerMiddleware.startListening({
+  actionCreator: login,
+  effect: async (action, listenerApi) => {
+    const { payload } = action;
+
+    console.log('🔐 User logged in successfully:', payload.user.email);
+
+    // Show welcome toast
+    listenerApi.dispatch(
+      showToast({
+        message: `Welcome back, ${payload.user.name}!`,
+        severity: 'success',
+        duration: 5000,
+      })
+    );
+
+    // Log analytics event (if enabled)
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'login', {
+        event_category: 'authentication',
+        event_label: payload.user.role,
       });
     }
   },
 });
 
-/**
- * Type-safe version of addListener
- */
-export const addAppListener = addListener;
+// Listen for logout
+listenerMiddleware.startListening({
+  actionCreator: logout,
+  effect: async (action, listenerApi) => {
+    console.log('🚪 User logged out');
 
-/**
- * Export the listener middleware for store configuration
- */
-export const { middleware } = listenerMiddleware;
-
-/**
- * Utility to start listening to specific actions
- * This is a scaffold - actual listeners will be added in subsequent tasks
- */
-export const startAppListening = listenerMiddleware.startListening;
-
-/**
- * Development utilities for debugging listeners
- */
-if (config.environment === 'DEV') {
-  // Log when listeners are added/removed
-  const originalStartListening = listenerMiddleware.startListening;
-  listenerMiddleware.startListening = ((options: any) => {
-    console.log(
-      '🎧 Adding listener for:',
-      options.actionCreator?.type || options.type || 'unknown'
+    // Show goodbye message
+    listenerApi.dispatch(
+      showToast({
+        message: 'You have been logged out successfully',
+        severity: 'info',
+        duration: 3000,
+      })
     );
-    return originalStartListening(options);
-  }) as any;
+
+    // Clear any cached data if needed
+    // This will be expanded in future sub-tasks
+  },
+});
+
+/**
+ * Error handling listeners
+ */
+
+// Listen for authentication errors
+listenerMiddleware.startListening({
+  actionCreator: setAuthError,
+  effect: async (action, listenerApi) => {
+    const errorMessage = action.payload;
+
+    if (errorMessage) {
+      console.error('🔴 Authentication error:', errorMessage);
+
+      // Show error toast for auth failures
+      listenerApi.dispatch(
+        showToast({
+          message: errorMessage,
+          severity: 'error',
+          duration: 8000,
+        })
+      );
+    }
+  },
+});
+
+// Listen for RTK Query errors (placeholder for future implementation)
+listenerMiddleware.startListening({
+  matcher: isAnyOf(),
+  // This will be expanded when we add RTK Query endpoints
+  // For now, we'll add a placeholder matcher
+  effect: async (action, _listenerApi) => {
+    // RTK Query error handling will be implemented in future sub-tasks
+    // This is a placeholder for the infrastructure
+    console.log('🔄 RTK Query action detected:', action.type);
+  },
+});
+
+/**
+ * Generic error listener for unhandled promise rejections
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', event => {
+    console.error('🚨 Unhandled promise rejection:', event.reason);
+
+    // Log to error service (will be implemented in future sub-tasks)
+    // For now, just log to console
+  });
 }
 
 /**
- * Listener management utilities
+ * Development helpers
+ */
+if (process.env.NODE_ENV === 'development') {
+  // Log all actions for debugging
+  listenerMiddleware.startListening({
+    predicate: () => true,
+    effect: (action, listenerApi) => {
+      const state = listenerApi.getState() as RootState;
+      console.log('🎬 Action dispatched:', action.type, {
+        action,
+        state: {
+          auth: state.auth.user
+            ? {
+                user: state.auth.user.email,
+                isAuthenticated: state.auth.isAuthenticated,
+              }
+            : null,
+          ui: state.ui,
+        },
+      });
+    },
+  });
+}
+
+/**
+ * Listener utilities for starting/stopping listeners programmatically
  */
 export const listenerUtils = {
   /**
-   * Get count of active listeners (development only)
+   * Start all listeners (called automatically when middleware is added to store)
    */
-  getActiveListenersCount: () => {
-    if (config.environment === 'DEV') {
-      // This is a development utility - in a real implementation,
-      // we would need to track listeners manually or use internal APIs
-      return 0; // Placeholder
-    }
-    return null;
+  startAll: () => {
+    console.log('🎧 All listeners started');
   },
 
   /**
    * Clear all listeners (useful for testing)
    */
-  clearListeners: () => {
+  clearAll: () => {
     listenerMiddleware.clearListeners();
+    console.log('🧹 All listeners cleared');
+  },
+
+  /**
+   * Get listener statistics
+   */
+  getStats: () => {
+    // This would return listener statistics in a real implementation
+    return {
+      activeListeners: 'listeners are active', // Placeholder
+      totalActions: 'total actions processed', // Placeholder
+    };
   },
 };
-
-// Export types for use in other files
-export type AppListenerApi = Parameters<
-  Parameters<typeof startAppListening>[0]['effect']
->[1];
-export type AppStartListening = typeof startAppListening;

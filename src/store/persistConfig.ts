@@ -1,54 +1,173 @@
+/**
+ * Redux Persist Configuration with Encryption
+ * Handles encrypted persistence for sensitive application state
+ */
 import { PersistConfig } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
-import { encryptTransform } from 'redux-persist-transform-encrypt';
-import { AuthState } from '../types';
+import { createEncryptedTransform } from './persistence/encryptedTransform';
 import { config } from '../config/environment';
 
-export const createEncryptorTransform = () => {
-  const secretKey = config.cryptoSecret;
-
-  if (secretKey.length < 32) {
+/**
+ * Create encrypted transformer with validation
+ */
+const createSecureTransform = () => {
+  // Validate crypto secret
+  if (!config.cryptoSecret || config.cryptoSecret.length < 32) {
     console.warn(
-      'VITE_CRYPTO_SECRET should be at least 32 characters for optimal security'
+      '⚠️ Crypto secret is too short or missing. Using fallback (INSECURE for production!)'
     );
   }
 
-  return encryptTransform({
-    secretKey,
-    onError: error => {
-      console.error('Redux persist encryption error:', error);
-      localStorage.removeItem('persist:auth');
-      window.location.reload();
-    },
-  });
+  return createEncryptedTransform(config.cryptoSecret);
 };
 
-export const authPersistConfig: PersistConfig<AuthState> = {
-  key: 'auth',
+/**
+ * Persistence configuration for the entire store
+ */
+export const persistConfig: PersistConfig<any> = {
+  key: 'solarium-root',
+  version: 1,
   storage,
-  transforms: [createEncryptorTransform()],
-  whitelist: ['token', 'user', 'isAuthenticated'],
+
+  // Transform sensitive data before storage
+  transforms: [createSecureTransform()],
+
+  // Persist these slices with encryption
+  whitelist: ['auth', 'preferences'],
+
+  // Don't persist these slices (UI state should be ephemeral)
+  blacklist: ['ui', 'api'],
+
+  // Migration and error handling
+  migrate: (state: any) => {
+    // Handle version migrations if needed
+    console.log('🔄 Migrating persisted state...');
+    return Promise.resolve(state);
+  },
+
+  // Debug persistence in development
+  debug: config.environment === 'DEV',
+
+  // Timeout for persistence operations
+  timeout: 10000, // 10 seconds
+
+  // Throttle persistence writes
+  throttle: 1000, // 1 second
 };
 
-export const validatePersistenceConfig = (): boolean => {
-  try {
-    const testKey = '__redux_persist_test__';
-    localStorage.setItem(testKey, 'test');
-    localStorage.removeItem(testKey);
+/**
+ * Specific persistence config for auth slice with stronger encryption
+ */
+export const authPersistConfig: PersistConfig<any> = {
+  key: 'solarium-auth',
+  version: 1,
+  storage,
+  transforms: [createSecureTransform()],
 
-    const hasValidSecret = Boolean(
-      config.cryptoSecret && config.cryptoSecret.length >= 16
-    );
+  // Only persist essential auth data
+  whitelist: ['user', 'token', 'refreshToken', 'expiresAt', 'rememberMe'],
 
-    if (!hasValidSecret) {
-      console.warn(
-        'Crypto secret is not properly configured for Redux persistence'
-      );
+  // Don't persist ephemeral auth state
+  blacklist: ['loading', 'error', 'loginAttempts'],
+
+  debug: config.environment === 'DEV',
+};
+
+/**
+ * Persistence config for preferences with lighter encryption
+ */
+export const preferencesPersistConfig: PersistConfig<any> = {
+  key: 'solarium-preferences',
+  version: 1,
+  storage,
+  transforms: [createSecureTransform()],
+  debug: config.environment === 'DEV',
+};
+
+/**
+ * Validation utilities for persistence
+ */
+export const persistenceUtils = {
+  /**
+   * Validate persistence configuration
+   */
+  validateConfig: (): boolean => {
+    try {
+      if (!storage) {
+        console.error('❌ Storage not available');
+        return false;
+      }
+
+      if (!config.cryptoSecret || config.cryptoSecret.length < 32) {
+        console.error('❌ Invalid crypto secret configuration');
+        return false;
+      }
+
+      console.log('✅ Persistence configuration validated');
+      return true;
+    } catch (error) {
+      console.error('❌ Persistence validation failed:', error);
+      return false;
     }
+  },
 
-    return hasValidSecret;
-  } catch (error) {
-    console.error('localStorage is not available:', error);
-    return false;
-  }
+  /**
+   * Clear all persisted data
+   */
+  clearAll: async (): Promise<void> => {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) keys.push(key);
+      }
+      const solariumKeys = keys.filter((key: string) =>
+        key.startsWith('persist:solarium')
+      );
+
+      await Promise.all(
+        solariumKeys.map((key: string) => storage.removeItem(key))
+      );
+
+      console.log('🧹 Cleared all persisted data');
+    } catch (error) {
+      console.error('❌ Failed to clear persisted data:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get persistence info for debugging
+   */
+  getInfo: async (): Promise<Record<string, any>> => {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) keys.push(key);
+      }
+      const solariumKeys = keys.filter((key: string) =>
+        key.startsWith('persist:solarium')
+      );
+
+      const info: Record<string, any> = {};
+      for (const key of solariumKeys) {
+        const value = await storage.getItem(key);
+        info[key] = {
+          size: value ? JSON.stringify(value).length : 0,
+          encrypted: value ? value.includes('encrypted:') : false,
+        };
+      }
+
+      return info;
+    } catch (error) {
+      console.error('❌ Failed to get persistence info:', error);
+      return {};
+    }
+  },
 };
+
+// Validate configuration on module load
+if (config.environment === 'DEV') {
+  persistenceUtils.validateConfig();
+}

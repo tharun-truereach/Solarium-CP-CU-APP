@@ -3,7 +3,7 @@
  * Handles login, logout, token refresh, and comprehensive user management operations
  */
 
-import { baseApi } from '../baseApi';
+import { apiSlice } from '../apiSlice';
 import type {
   LoginCredentials,
   LoginResponse,
@@ -53,31 +53,9 @@ export interface PasswordResetConfirm {
 }
 
 /**
- * Two-factor authentication setup payload
- */
-export interface TwoFactorSetup {
-  secret: string;
-  code: string;
-}
-
-/**
- * Session information interface
- */
-export interface SessionInfo {
-  id: string;
-  deviceId: string;
-  deviceName: string;
-  ipAddress: string;
-  lastActivity: string;
-  isCurrent: boolean;
-  browser?: string;
-  os?: string;
-}
-
-/**
  * Enhanced auth endpoints extension of base API
  */
-export const authEndpoints = baseApi.injectEndpoints({
+export const authEndpoints = apiSlice.injectEndpoints({
   endpoints: builder => ({
     /**
      * Enhanced login mutation with security features
@@ -86,7 +64,7 @@ export const authEndpoints = baseApi.injectEndpoints({
       query: credentials => ({
         url: '/auth/login',
         method: 'POST',
-        body: credentials,
+        data: credentials,
       }),
       invalidatesTags: ['User', 'Auth'],
       transformResponse: (response: ExtendedLoginResponse) => {
@@ -187,7 +165,7 @@ export const authEndpoints = baseApi.injectEndpoints({
      * Verify token validity
      */
     verifyToken: builder.query<{ valid: boolean; user?: User }, void>({
-      query: () => '/auth/verify',
+      query: () => ({ url: '/auth/verify' }),
       providesTags: ['Auth'],
       transformResponse: (response: { valid: boolean; user?: User }) => {
         if (response.valid) {
@@ -207,7 +185,7 @@ export const authEndpoints = baseApi.injectEndpoints({
      * Get current user profile
      */
     getCurrentUser: builder.query<User, void>({
-      query: () => '/auth/me',
+      query: () => ({ url: '/auth/me' }),
       providesTags: ['User'],
       transformResponse: (user: User) => {
         console.log('👤 User profile loaded:', {
@@ -226,7 +204,7 @@ export const authEndpoints = baseApi.injectEndpoints({
       query: profileData => ({
         url: '/auth/profile',
         method: 'PATCH',
-        body: profileData,
+        data: profileData,
       }),
       invalidatesTags: ['User'],
       transformResponse: (user: User) => {
@@ -249,7 +227,7 @@ export const authEndpoints = baseApi.injectEndpoints({
       query: passwordData => ({
         url: '/auth/change-password',
         method: 'POST',
-        body: passwordData,
+        data: passwordData,
       }),
       transformResponse: () => {
         console.log('✅ Password changed successfully');
@@ -270,7 +248,7 @@ export const authEndpoints = baseApi.injectEndpoints({
       query: resetData => ({
         url: '/auth/forgot-password',
         method: 'POST',
-        body: resetData,
+        data: resetData,
       }),
       transformResponse: () => {
         console.log('✅ Password reset email sent');
@@ -290,7 +268,7 @@ export const authEndpoints = baseApi.injectEndpoints({
       query: resetData => ({
         url: '/auth/reset-password',
         method: 'POST',
-        body: resetData,
+        data: resetData,
       }),
       transformResponse: () => {
         console.log('✅ Password reset completed');
@@ -300,100 +278,6 @@ export const authEndpoints = baseApi.injectEndpoints({
           status: response.status,
           message: response.data?.message || 'Password reset failed',
         };
-      },
-    }),
-
-    /**
-     * Setup two-factor authentication
-     */
-    setupTwoFactor: builder.mutation<
-      { qrCode: string; backupCodes: string[] },
-      void
-    >({
-      query: () => ({
-        url: '/auth/2fa/setup',
-        method: 'POST',
-      }),
-      invalidatesTags: ['User'],
-      transformResponse: (response: {
-        qrCode: string;
-        backupCodes: string[];
-      }) => {
-        console.log('🔐 Two-factor authentication setup initiated');
-        return response;
-      },
-    }),
-
-    /**
-     * Confirm two-factor authentication setup
-     */
-    confirmTwoFactor: builder.mutation<void, TwoFactorSetup>({
-      query: setupData => ({
-        url: '/auth/2fa/confirm',
-        method: 'POST',
-        body: setupData,
-      }),
-      invalidatesTags: ['User'],
-      transformResponse: () => {
-        console.log('✅ Two-factor authentication enabled');
-      },
-    }),
-
-    /**
-     * Disable two-factor authentication
-     */
-    disableTwoFactor: builder.mutation<
-      void,
-      { password: string; code: string }
-    >({
-      query: disableData => ({
-        url: '/auth/2fa/disable',
-        method: 'POST',
-        body: disableData,
-      }),
-      invalidatesTags: ['User'],
-      transformResponse: () => {
-        console.log('✅ Two-factor authentication disabled');
-      },
-    }),
-
-    /**
-     * Get active sessions
-     */
-    getActiveSessions: builder.query<SessionInfo[], void>({
-      query: () => '/auth/sessions',
-      providesTags: ['Auth'],
-      transformResponse: (sessions: SessionInfo[]) => {
-        console.log('📱 Active sessions loaded:', sessions.length);
-        return sessions;
-      },
-    }),
-
-    /**
-     * Revoke session
-     */
-    revokeSession: builder.mutation<void, string>({
-      query: sessionId => ({
-        url: `/auth/sessions/${sessionId}`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: ['Auth'],
-      transformResponse: () => {
-        console.log('✅ Session revoked successfully');
-      },
-    }),
-
-    /**
-     * Revoke all other sessions
-     */
-    revokeAllSessions: builder.mutation<void, void>({
-      query: () => ({
-        url: '/auth/sessions/revoke-all',
-        method: 'POST',
-      }),
-      invalidatesTags: ['Auth'],
-      transformResponse: () => {
-        console.log('✅ All other sessions revoked');
       },
     }),
 
@@ -409,7 +293,7 @@ export const authEndpoints = baseApi.injectEndpoints({
       },
       void
     >({
-      query: () => '/auth/status',
+      query: () => ({ url: '/auth/status' }),
       providesTags: ['Auth'],
       transformResponse: (response: any) => {
         console.log(
@@ -442,16 +326,6 @@ export const {
   // Password reset
   useRequestPasswordResetMutation,
   useConfirmPasswordResetMutation,
-
-  // Two-factor authentication
-  useSetupTwoFactorMutation,
-  useConfirmTwoFactorMutation,
-  useDisableTwoFactorMutation,
-
-  // Session management
-  useGetActiveSessionsQuery,
-  useRevokeSessionMutation,
-  useRevokeAllSessionsMutation,
 } = authEndpoints;
 
 /**

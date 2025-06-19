@@ -1,12 +1,13 @@
 /**
  * Enhanced Authentication slice for Redux Toolkit
- * Manages user authentication state, tokens, session data, and security features
+ * Manages user authentication state, tokens, session data, and territory access
  */
 
 import { createSlice, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import type { RootState } from '../store';
-import type { User } from '../../types';
+import type { User, Territory } from '../../types';
 import { isTokenExpired } from '../../utils/jwt';
+import { getUserTerritoryAccess } from '../../utils/territory';
 
 /**
  * Authentication state interface
@@ -349,6 +350,33 @@ export const selectIsCP = createSelector(
 export const selectIsCustomer = createSelector(
   [selectUserRole],
   role => role === 'customer'
+);
+
+/**
+ * Territory-related selectors
+ */
+export const selectUserTerritories = createSelector(
+  [selectUser],
+  user => user?.territories || []
+);
+
+export const selectUserTerritoryAccess = createSelector([selectUser], user =>
+  getUserTerritoryAccess(user)
+);
+
+export const selectHasFullTerritoryAccess = createSelector(
+  [selectUserTerritoryAccess],
+  access => access.hasFullAccess
+);
+
+export const selectAccessibleTerritories = createSelector(
+  [selectUserTerritoryAccess],
+  access => access.territories
+);
+
+export const selectCanAccessTerritory = createSelector(
+  [selectUserTerritoryAccess],
+  access => (territory: Territory) => access.canAccessTerritory(territory)
 );
 
 /**

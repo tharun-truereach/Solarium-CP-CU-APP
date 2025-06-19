@@ -16,7 +16,7 @@ import {
 } from 'redux-persist';
 import authSlice from './slices/authSlice';
 import uiSlice from './slices/uiSlice';
-import { authPersistConfig, validatePersistenceConfig } from './persistConfig';
+import { authPersistConfig, persistenceUtils } from './persistConfig';
 import { apiSlice } from '../api/apiSlice';
 import { errorMiddleware } from './middleware/errorMiddleware';
 
@@ -32,7 +32,7 @@ const rootReducer = combineReducers({
  * @returns Configured Redux store
  */
 export const configureAppStore = (): { store: Store; persistor: any } => {
-  const isPersistenceValid = validatePersistenceConfig();
+  const isPersistenceValid = persistenceUtils.validateConfig();
 
   if (!isPersistenceValid) {
     console.warn(
@@ -59,13 +59,32 @@ export const configureAppStore = (): { store: Store; persistor: any } => {
 };
 
 // Create the store and persistor instances
-const { store, persistor } = configureAppStore();
-
-// Export store types for TypeScript
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
-export type AppStore = typeof store;
+const { store } = configureAppStore();
 
 // Export store and persistor instances
-export { store, persistor };
 export default store;
+
+/**
+ * Store module exports
+ * Centralizes all store-related exports for easy importing
+ */
+
+// Store configuration and types
+export { store, persistor, storeUtils } from './store';
+export type { RootState, AppDispatch } from './store';
+
+// Hooks
+export { useAppDispatch, useAppSelector } from './hooks';
+
+// Slices are imported and used in store configuration above
+
+// Persistence configuration
+export { persistConfig, persistenceUtils } from './persistConfig';
+
+// Listener middleware
+export { listenerMiddleware, listenerUtils } from './listenerMiddleware';
+
+// API slice
+export { apiSlice } from '../api/apiSlice';
+
+console.log('📦 Store module exports ready');

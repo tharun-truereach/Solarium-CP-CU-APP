@@ -97,62 +97,50 @@ const toNumber = (value: string): number => {
  */
 export const config: EnvironmentConfig = {
   // Environment
-  environment: getEnvVar('REACT_APP_ENVIRONMENT', 'DEV') as
+  environment: getEnvVar('VITE_ENVIRONMENT', 'DEV') as
     | 'DEV'
     | 'STAGING'
     | 'PROD',
 
-  // API Configuration
-  apiBaseUrl: getEnvVar('REACT_APP_API_BASE_URL', 'http://localhost:3000'),
-  apiTimeout: getEnvVar('REACT_APP_API_TIMEOUT', 30000, toNumber),
+  // API Configuration - Updated to use /api/v1 path
+  apiBaseUrl: getEnvVar('VITE_API_BASE_URL', 'http://localhost:3000/api/v1'),
+  apiTimeout: getEnvVar('VITE_API_TIMEOUT', 30000, toNumber),
 
   // Session Configuration
-  sessionTimeoutMinutes: getEnvVar(
-    'REACT_APP_SESSION_TIMEOUT_MIN',
-    30,
-    toNumber
-  ),
-  sessionWarningMinutes: getEnvVar(
-    'REACT_APP_SESSION_WARNING_MIN',
-    5,
-    toNumber
-  ),
+  sessionTimeoutMinutes: getEnvVar('VITE_SESSION_TIMEOUT_MIN', 30, toNumber),
+  sessionWarningMinutes: getEnvVar('VITE_SESSION_WARNING_MIN', 5, toNumber),
   cryptoSecret: getEnvVar(
     'VITE_CRYPTO_SECRET',
     'fallback-secret-key-for-development-only-32chars'
   ),
 
   // Feature Flags
-  enableDebugTools: getEnvVar('REACT_APP_ENABLE_DEBUG_TOOLS', true, toBool),
-  enableMockAuth: getEnvVar('REACT_APP_ENABLE_MOCK_AUTH', true, toBool),
-  enableServiceWorker: getEnvVar(
-    'REACT_APP_ENABLE_SERVICE_WORKER',
-    false,
-    toBool
-  ),
+  enableDebugTools: getEnvVar('VITE_ENABLE_DEBUG_TOOLS', true, toBool),
+  enableMockAuth: getEnvVar('VITE_ENABLE_MOCK_AUTH', true, toBool),
+  enableServiceWorker: getEnvVar('VITE_ENABLE_SERVICE_WORKER', false, toBool),
 
   // External Services
-  sentryDsn: getProcessEnv('REACT_APP_SENTRY_DSN') || undefined,
-  analyticsId: getProcessEnv('REACT_APP_ANALYTICS_ID') || 'test-analytics-id',
+  sentryDsn: getProcessEnv('VITE_SENTRY_DSN') || undefined,
+  analyticsId: getProcessEnv('VITE_ANALYTICS_ID') || 'test-analytics-id',
 
   // Build Information
-  buildNumber: getEnvVar('REACT_APP_BUILD_NUMBER', 'test-build'),
-  version: getEnvVar('REACT_APP_VERSION', '1.0.0-test'),
+  buildNumber: getEnvVar('VITE_BUILD_NUMBER', 'test-build'),
+  version: getEnvVar('VITE_VERSION', '1.0.0-test'),
 
   // Debug Settings
-  logLevel: getEnvVar('REACT_APP_LOG_LEVEL', 'debug') as
+  logLevel: getEnvVar('VITE_LOG_LEVEL', 'debug') as
     | 'debug'
     | 'info'
     | 'warn'
     | 'error',
-  showReduxDevtools: getEnvVar('REACT_APP_SHOW_REDUX_DEVTOOLS', true, toBool),
+  showReduxDevtools: getEnvVar('VITE_SHOW_REDUX_DEVTOOLS', true, toBool),
 };
 
 /**
  * Environment validation
  */
 export const validateEnvironment = (): void => {
-  const requiredVars = ['REACT_APP_ENVIRONMENT', 'REACT_APP_API_BASE_URL'];
+  const requiredVars = ['VITE_ENVIRONMENT', 'VITE_API_BASE_URL'];
   const missing = requiredVars.filter(key => !getProcessEnv(key));
 
   if (missing.length > 0) {
@@ -173,6 +161,13 @@ export const validateEnvironment = (): void => {
     new URL(config.apiBaseUrl);
   } catch {
     throw new Error(`Invalid API base URL: ${config.apiBaseUrl}`);
+  }
+
+  // Validate crypto secret length for security
+  if (config.cryptoSecret.length < 32) {
+    console.warn(
+      '⚠️ VITE_CRYPTO_SECRET should be at least 32 characters for optimal security'
+    );
   }
 };
 

@@ -1,21 +1,79 @@
 /**
- * Login page component - placeholder for authentication
- * Provides basic login form for testing routing functionality
+ * Enhanced Login page component with comprehensive security and accessibility
+ * Provides secure email/password authentication with proper error handling and WCAG 2.1 AA compliance
  */
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Container,
+  Paper,
+  Typography,
+  Alert,
+  Link,
+  Divider,
+  useTheme,
+  useMediaQuery,
+  IconButton,
+  InputAdornment,
+  TextField,
+  Button,
+  FormControlLabel,
+  Checkbox,
+} from '@mui/material';
+import {
+  Email as EmailIcon,
+  Lock as LockIcon,
+  Login as LoginIcon,
+  Visibility,
+  VisibilityOff,
+} from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { ROUTES } from '../routes/routes';
+import { VALIDATION_PATTERNS, ERROR_MESSAGES } from '../utils/constants';
 
+/**
+ * Interface for login form values
+ */
+interface LoginFormValues {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
+/**
+ * Enhanced Login component with accessibility and security features
+ */
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { login, isAuthenticated } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const location = useLocation();
+  const { login, isAuthenticated, error: authError, isLoading } = useAuth();
+
+  // Form state
+  const [formValues, setFormValues] = useState<LoginFormValues>({
+    email: '',
+    password: '',
+    rememberMe: false,
+  });
+  const [formErrors, setFormErrors] = useState<Partial<LoginFormValues>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutTimer, setLockoutTimer] = useState<number>(0);
+  const [submitError, setSubmitError] = useState<string>('');
+
+  // Refs for focus management
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const errorAlertRef = useRef<HTMLDivElement>(null);
+
+  // Focus management for accessibility
+  useEffect(() => {
+    // Focus email input on component mount
+    emailInputRef.current?.focus();
+  }, []);
 
   // Redirect if already authenticated
   if (isAuthenticated) {
@@ -23,79 +81,388 @@ const Login: React.FC = () => {
     return <Navigate to={from} replace />;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
+  // Validation function
+  const validateForm = (): boolean => {
+    const errors: Partial<LoginFormValues> = {};
+
+    if (!formValues.email) {
+      errors.email = 'Email is required';
+    } else if (!VALIDATION_PATTERNS.EMAIL.test(formValues.email)) {
+      errors.email = 'Please enter a valid email address';
+    } else if (formValues.email.length > 255) {
+      errors.email = 'Email must be less than 255 characters';
+    }
+
+    if (!formValues.password) {
+      errors.password = 'Password is required';
+    } else if (formValues.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    } else if (formValues.password.length > 128) {
+      errors.password = 'Password must be less than 128 characters';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Handle form submission
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitError('');
+
+    if (!validateForm()) {
+      // Focus first error field
+      if (formErrors.email) {
+        emailInputRef.current?.focus();
+      } else if (formErrors.password) {
+        passwordInputRef.current?.focus();
+      }
+      return;
+    }
+
+    // Check for account lockout
+    if (isLocked) {
+      setSubmitError(
+        'Account temporarily locked due to multiple failed attempts'
+      );
+      return;
+    }
 
     try {
-      await login({ email, password });
+      await login({
+        email: formValues.email.trim().toLowerCase(),
+        password: formValues.password,
+        rememberMe: formValues.rememberMe,
+      });
+
+      // Reset login attempts on successful login
+      setLoginAttempts(0);
+      setIsLocked(false);
+
+      // Redirect to intended page
       const from = location.state?.from?.pathname || ROUTES.DASHBOARD;
       navigate(from, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      setIsSubmitting(false);
+    } catch (error: any) {
+      const errorMessage = error.message || ERROR_MESSAGES.GENERIC_ERROR;
+
+      // Increment login attempts
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+
+      // Lock account after 5 failed attempts
+      if (newAttempts >= 5) {
+        setIsLocked(true);
+        setLockoutTimer(15 * 60); // 15 minutes
+        setSubmitError(
+          'Account locked for 15 minutes due to multiple failed login attempts'
+        );
+
+        // Start countdown timer
+        const timer = setInterval(() => {
+          setLockoutTimer(prev => {
+            if (prev <= 1) {
+              setIsLocked(false);
+              setLoginAttempts(0);
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        // Handle specific error types
+        if (errorMessage.toLowerCase().includes('email')) {
+          setFormErrors({ email: errorMessage });
+          emailInputRef.current?.focus();
+        } else if (errorMessage.toLowerCase().includes('password')) {
+          setFormErrors({ password: errorMessage });
+          passwordInputRef.current?.focus();
+        } else {
+          setSubmitError(errorMessage);
+        }
+      }
+
+      // Focus error alert for screen readers
+      setTimeout(() => {
+        errorAlertRef.current?.focus();
+      }, 100);
     }
   };
 
+  // Handle input changes
+  const handleInputChange =
+    (field: keyof LoginFormValues) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value =
+        field === 'rememberMe' ? event.target.checked : event.target.value;
+      setFormValues(prev => ({ ...prev, [field]: value }));
+
+      // Clear field error when user starts typing
+      if (formErrors[field]) {
+        setFormErrors(prev => ({ ...prev, [field]: undefined }));
+      }
+
+      // Clear submit error when user makes changes
+      if (submitError) {
+        setSubmitError('');
+      }
+    };
+
+  // Handle password visibility toggle
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  // Format lockout timer display
+  const formatLockoutTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-header">
-          <h1>Solarium Web Portal</h1>
-          <p>Sign in to your account</p>
-        </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.default',
+        py: 3,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 3, sm: 4, md: 5 },
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
+        >
+          {/* Header */}
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography
+              variant={isMobile ? 'h4' : 'h3'}
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                color: 'primary.main',
+                mb: 1,
+              }}
+            >
+              Solarium Portal
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+              Sign in to your account
+            </Typography>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          {error && <div className="error-message">{error}</div>}
+            {/* Lockout warning */}
+            {isLocked && (
+              <Alert
+                severity="warning"
+                sx={{ mb: 2, textAlign: 'left' }}
+                role="alert"
+                aria-live="polite"
+              >
+                Account locked for {formatLockoutTime(lockoutTimer)} due to
+                multiple failed attempts
+              </Alert>
+            )}
+          </Box>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              disabled={isSubmitting}
-              placeholder="Enter your email"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              disabled={isSubmitting}
-              placeholder="Enter your password"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="login-button"
-            disabled={isSubmitting}
+          {/* Login Form */}
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            noValidate
+            aria-label="Login form"
           >
-            {isSubmitting ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+            {/* Error Display */}
+            {(submitError || authError) && (
+              <Alert
+                ref={errorAlertRef}
+                severity="error"
+                sx={{ mb: 3 }}
+                role="alert"
+                aria-live="assertive"
+                tabIndex={-1}
+              >
+                {submitError || authError}
+              </Alert>
+            )}
 
-        <div className="login-help">
-          <p className="demo-info">
-            <strong>Demo Credentials:</strong>
-            <br />
-            Admin: admin@solarium.com / any password
-            <br />
-            KAM: kam@solarium.com / any password
-          </p>
-        </div>
-      </div>
-    </div>
+            {/* Email Field */}
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                ref={emailInputRef}
+                fullWidth
+                id="email"
+                name="email"
+                label="Email Address"
+                type="email"
+                autoComplete="username"
+                value={formValues.email}
+                onChange={handleInputChange('email')}
+                error={Boolean(formErrors.email)}
+                helperText={formErrors.email}
+                disabled={isLoading || isLocked}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                inputProps={{
+                  'aria-label': 'Email address',
+                  maxLength: 255,
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Password Field */}
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                ref={passwordInputRef}
+                fullWidth
+                id="password"
+                name="password"
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={formValues.password}
+                onChange={handleInputChange('password')}
+                error={Boolean(formErrors.password)}
+                helperText={formErrors.password}
+                disabled={isLoading || isLocked}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockIcon />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={
+                          showPassword ? 'Hide password' : 'Show password'
+                        }
+                        onClick={handleTogglePasswordVisibility}
+                        edge="end"
+                        disabled={isLoading || isLocked}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                inputProps={{
+                  'aria-label': 'Password',
+                  maxLength: 128,
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Remember Me */}
+            <Box sx={{ mb: 3 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formValues.rememberMe}
+                    onChange={handleInputChange('rememberMe')}
+                    disabled={isLoading || isLocked}
+                    color="primary"
+                  />
+                }
+                label="Remember me"
+              />
+            </Box>
+
+            {/* Login Button */}
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              size="large"
+              disabled={isLoading || isLocked}
+              startIcon={isLoading ? undefined : <LoginIcon />}
+              sx={{
+                mb: 3,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              {isLoading ? 'Signing In...' : 'Sign In'}
+            </Button>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ textAlign: 'center', mb: 3, fontSize: '0.75rem' }}
+            >
+              {loginAttempts > 0 &&
+                !isLocked &&
+                `${5 - loginAttempts} attempts remaining before account lockout`}
+            </Typography>
+
+            {/* Divider */}
+            <Divider sx={{ my: 3 }} />
+
+            {/* Additional Links */}
+            <Box sx={{ textAlign: 'center' }}>
+              <Link
+                component="button"
+                type="button"
+                variant="body2"
+                onClick={() => navigate('/forgot-password')}
+                disabled={isLoading}
+                sx={{
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  '&:hover': { textDecoration: 'none' },
+                }}
+                aria-label="Go to forgot password page"
+              >
+                Forgot your password?
+              </Link>
+            </Box>
+
+            {/* Demo Information - Remove in production */}
+            {process.env.NODE_ENV === 'development' && (
+              <Alert
+                severity="info"
+                sx={{ mt: 3, textAlign: 'left' }}
+                role="region"
+                aria-label="Demo information"
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                  Demo Credentials:
+                </Typography>
+                <Typography variant="body2" component="div">
+                  • Admin: admin@solarium.com / Admin123!
+                  <br />• KAM: kam@solarium.com / Kam123!
+                </Typography>
+              </Alert>
+            )}
+          </Box>
+        </Paper>
+      </Container>
+    </Box>
   );
 };
 
