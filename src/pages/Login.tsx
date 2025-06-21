@@ -576,8 +576,8 @@ const Login: React.FC = () => {
                   Demo Credentials:
                 </Typography>
                 <Typography variant="body2" component="div">
-                  • Admin: admin@solarium.com / Admin123!
-                  <br />• KAM: kam@solarium.com / Kam123!
+                  • Admin: admin@solarium.com / password123
+                  <br />• KAM: kam@solarium.com / password123
                 </Typography>
               </Alert>
             )}

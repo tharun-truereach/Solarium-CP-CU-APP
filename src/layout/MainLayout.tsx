@@ -1,8 +1,8 @@
 /**
  * MainLayout component - responsive layout with header, sidebar, and main content
- * Provides the primary layout structure for authenticated pages
+ * Provides the primary layout structure for authenticated pages with sidebar persistence
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import GlobalErrorToast from '../components/GlobalErrorToast';
+import { STORAGE_KEYS } from '../utils/constants';
 
 const DRAWER_WIDTH = 280;
 const DRAWER_WIDTH_COLLAPSED = 60;
@@ -24,6 +25,30 @@ const DRAWER_WIDTH_COLLAPSED = 60;
 interface MainLayoutProps {
   children: React.ReactNode;
 }
+
+/**
+ * Read sidebar collapse state from localStorage
+ */
+const readSidebarState = (): boolean => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.SIDEBAR_STATE);
+    return stored ? JSON.parse(stored) : false;
+  } catch (error) {
+    console.warn('Failed to read sidebar state:', error);
+    return false;
+  }
+};
+
+/**
+ * Persist sidebar collapse state to localStorage
+ */
+const persistSidebarState = (collapsed: boolean): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.SIDEBAR_STATE, JSON.stringify(collapsed));
+  } catch (error) {
+    console.warn('Failed to persist sidebar state:', error);
+  }
+};
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const theme = useTheme();
@@ -33,11 +58,26 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
 
+  /**
+   * Initialize sidebar state from localStorage on mount
+   */
+  useEffect(() => {
+    if (!isMobile) {
+      const savedState = readSidebarState();
+      setDesktopCollapsed(savedState);
+    }
+  }, [isMobile]);
+
+  /**
+   * Handle drawer toggle with persistence for desktop
+   */
   const handleDrawerToggle = () => {
     if (isMobile) {
       setMobileOpen(!mobileOpen);
     } else {
-      setDesktopCollapsed(!desktopCollapsed);
+      const newCollapsedState = !desktopCollapsed;
+      setDesktopCollapsed(newCollapsedState);
+      persistSidebarState(newCollapsedState);
     }
   };
 

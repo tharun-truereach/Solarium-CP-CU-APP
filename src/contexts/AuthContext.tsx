@@ -120,6 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [refreshTokenMutation] = useRefreshTokenMutation();
   const [updateProfileMutation] = useUpdateProfileMutation();
 
+  // Reset loading state on mount to prevent stuck loading
+  useEffect(() => {
+    dispatch(setLoading(false));
+  }, [dispatch]);
+
   // Auto-verify token and fetch current user when authenticated
   useGetCurrentUserQuery(undefined, {
     skip: !isAuthenticated,
@@ -185,6 +190,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // Flush persistence to ensure login data is immediately saved
         await storeUtils.flushPersistence();
 
+        // Reset loading state on success
+        dispatch(setLoading(false));
+
         console.log('✅ Login successful and persisted');
       } catch (error: any) {
         dispatch(setLoading(false));
@@ -226,12 +234,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // Dispatch logout action to update state
       dispatch(logoutAction());
 
+      // Reset loading state on success
+      dispatch(setLoading(false));
+
       console.log('✅ Logout completed with persistence cleanup');
     } catch (error) {
       console.error('❌ Logout failed:', error);
 
       // Fallback: force logout even if cleanup fails
       dispatch(logoutAction());
+      dispatch(setLoading(false));
       try {
         await storeUtils.resetAuth();
       } catch (cleanupError) {

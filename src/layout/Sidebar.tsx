@@ -1,8 +1,8 @@
 /**
- * Sidebar component - navigation menu with role-based items
- * Supports collapsed state and mobile responsive behavior
+ * Enhanced Sidebar component - navigation menu with role-based items and persistence
+ * Supports collapsed state persistence and secure role-based filtering
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Box,
   List,
@@ -30,7 +30,9 @@ import {
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ROUTES } from '../routes/routes';
+import { ROUTES, getRoutesByRole } from '../routes/routes';
+import { STORAGE_KEYS } from '../utils/constants';
+
 interface SidebarProps {
   onClose?: () => void;
   collapsed: boolean;
@@ -47,6 +49,10 @@ interface NavigationItem {
   adminOnly?: boolean;
 }
 
+/**
+ * Complete navigation items configuration
+ * Maps to route definitions for consistency
+ */
 const navigationItems: NavigationItem[] = [
   {
     id: 'dashboard',
@@ -100,21 +106,6 @@ const navigationItems: NavigationItem[] = [
     adminOnly: true,
   },
   {
-    id: 'services',
-    label: 'Services',
-    icon: <Inventory />,
-    path: '/services',
-    allowedRoles: ['admin'],
-    adminOnly: true,
-  },
-  {
-    id: 'support',
-    label: 'Support',
-    icon: <Support />,
-    path: '/support',
-    allowedRoles: ['admin', 'kam'],
-  },
-  {
     id: 'settings',
     label: 'Settings',
     icon: <Settings />,
@@ -124,11 +115,47 @@ const navigationItems: NavigationItem[] = [
   },
 ];
 
+/**
+ * Persist sidebar collapse state to localStorage
+ */
+const persistSidebarState = (collapsed: boolean): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.SIDEBAR_STATE, JSON.stringify(collapsed));
+  } catch (error) {
+    console.warn('Failed to persist sidebar state:', error);
+  }
+};
+
+/**
+ * Read sidebar collapse state from localStorage
+ */
+const readSidebarState = (): boolean => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.SIDEBAR_STATE);
+    return stored ? JSON.parse(stored) : false;
+  } catch (error) {
+    console.warn('Failed to read sidebar state:', error);
+    return false;
+  }
+};
+
 const Sidebar: React.FC<SidebarProps> = ({ onClose, collapsed, isMobile }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  /**
+   * Persist sidebar state when collapsed prop changes (desktop only)
+   */
+  useEffect(() => {
+    if (!isMobile) {
+      persistSidebarState(collapsed);
+    }
+  }, [collapsed, isMobile]);
+
+  /**
+   * Handle navigation with mobile drawer close
+   */
   const handleNavigation = (path: string) => {
     navigate(path);
     if (isMobile && onClose) {
@@ -136,16 +163,39 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, collapsed, isMobile }) => {
     }
   };
 
-  const isItemAllowed = (item: NavigationItem) => {
-    if (!user || !item.allowedRoles) return true;
-    return item.allowedRoles.includes(user.role);
+  /**
+   * Enhanced role-based filtering using routes.ts for single-source truth
+   * Completely removes forbidden items from DOM for security
+   */
+  const getFilteredNavigationItems = (): NavigationItem[] => {
+    if (!user?.role) {
+      return [];
+    }
+
+    // Get accessible routes from single source of truth
+    const accessibleRoutes = getRoutesByRole(user.role);
+    const accessiblePaths = new Set(accessibleRoutes.map(route => route.path));
+
+    // Filter navigation items based on route accessibility
+    return navigationItems.filter(item => {
+      // Check if route is accessible to user's role
+      const isRouteAccessible = accessiblePaths.has(item.path);
+
+      // Additional security check against item's own role configuration
+      const isRoleAllowed =
+        !item.allowedRoles || item.allowedRoles.includes(user.role);
+
+      return isRouteAccessible && isRoleAllowed;
+    });
   };
 
+  const filteredNavigationItems = getFilteredNavigationItems();
+
+  /**
+   * Render individual navigation item with proper accessibility
+   */
   const renderNavItem = (item: NavigationItem) => {
     const isActive = location.pathname === item.path;
-    const isAllowed = isItemAllowed(item);
-
-    if (!isAllowed) return null;
 
     const listItem = (
       <ListItem key={item.id} disablePadding>
@@ -291,7 +341,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, collapsed, isMobile }) => {
 
       {/* Navigation */}
       <Box sx={{ flexGrow: 1, overflow: 'auto', py: 1 }}>
-        <List disablePadding>{navigationItems.map(renderNavItem)}</List>
+        <List disablePadding>{filteredNavigationItems.map(renderNavItem)}</List>
+
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === 'development' && (!collapsed || isMobile) && (
+          <Box sx={{ px: 2, py: 1, mt: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Role: {user?.role?.toUpperCase()} | Items:{' '}
+              {filteredNavigationItems.length}
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* User info (collapsed state) */}

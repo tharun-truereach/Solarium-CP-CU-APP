@@ -14,6 +14,7 @@ import GlobalLoading from './components/GlobalLoading';
 import SessionTimeout from './components/SessionTimeout';
 import EnvironmentBanner from './components/EnvironmentBanner';
 import AppRoutes from './routes/AppRoutes';
+import DebugConsole from './components/DebugConsole';
 import { SolariumThemeProvider } from './theme/ThemeProvider';
 import { store, persistor } from './store';
 import { useHttpClient } from './hooks/useHttpClient';
@@ -63,6 +64,7 @@ const App: React.FC = () => {
                       checkIntervalSeconds={60}
                     />
                     <EnvironmentBanner />
+                    <DebugConsole />
                   </AuthProvider>
                 </LoadingProvider>
               </HttpClientInitializer>

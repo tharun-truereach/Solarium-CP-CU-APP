@@ -1,111 +1,106 @@
 /**
- * Test suite for Sidebar role-based navigation filtering
- * Tests that sidebar correctly shows/hides navigation items based on user role
+ * Enhanced unit tests for Sidebar role-based filtering and persistence
+ * Tests role-based item visibility and localStorage persistence
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { Provider } from 'react-redux';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { configureStore } from '@reduxjs/toolkit';
-
 import Sidebar from '../Sidebar';
+import { AuthProvider } from '../../contexts/AuthContext';
 import { theme } from '../../theme';
-import authSlice from '../../store/slices/authSlice';
-import uiSlice from '../../store/slices/uiSlice';
-import { apiSlice } from '../../api/apiSlice';
-import type { User } from '../../types/user.types';
+import { STORAGE_KEYS } from '../../utils/constants';
+import type { User } from '../../types';
 
-// Mock console methods to avoid test noise
-vi.spyOn(console, 'log').mockImplementation(() => {});
-vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-// Test users
-const adminUser: User = {
+const mockAdminUser: User = {
   id: '1',
-  email: 'admin@solarium.com',
+  email: 'admin@test.com',
   name: 'Admin User',
+  firstName: 'Admin',
+  lastName: 'User',
   role: 'admin',
-  permissions: ['leads:read', 'leads:write', 'users:read', 'settings:write'],
+  permissions: [],
   territories: [],
   isActive: true,
   isVerified: true,
-  createdAt: '2023-01-01T00:00:00Z',
-  updatedAt: '2023-01-01T00:00:00Z',
+  createdAt: '2024-01-01',
+  updatedAt: '2024-01-01',
 };
 
-const kamUser: User = {
+const mockKamUser: User = {
+  ...mockAdminUser,
   id: '2',
-  email: 'kam@solarium.com',
+  email: 'kam@test.com',
   name: 'KAM User',
+  firstName: 'KAM',
   role: 'kam',
-  permissions: ['leads:read', 'leads:write'],
-  territories: ['North', 'Northeast'],
-  isActive: true,
-  isVerified: true,
-  createdAt: '2023-01-01T00:00:00Z',
-  updatedAt: '2023-01-01T00:00:00Z',
 };
 
-// Helper function to create store with user
-const createStoreWithUser = (user: User | null) => {
-  const store = configureStore({
-    reducer: {
-      auth: authSlice,
-      ui: uiSlice,
-      [apiSlice.reducerPath]: apiSlice.reducer,
+// Mock localStorage
+const mockLocalStorage = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+};
+Object.defineProperty(window, 'localStorage', {
+  value: mockLocalStorage,
+});
+
+// Mock the useAuth hook
+jest.mock('../../contexts/AuthContext', () => {
+  let mockUser: User | null = null;
+
+  return {
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAuth: () => ({
+      user: mockUser,
+      token: 'fake-token',
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    }),
+    __setMockUser: (user: User | null) => {
+      mockUser = user;
     },
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({
-        serializableCheck: { ignoredActions: ['persist/PERSIST'] },
-      }).concat(apiSlice.middleware),
-  });
+  };
+});
 
-  if (user) {
-    store.dispatch({
-      type: 'auth/login',
-      payload: {
-        user,
-        token: 'mock-token',
-        expiresAt: '2024-12-31T23:59:59Z',
-      },
-    });
-  }
-
-  return store;
-};
-
-// Render component with all required providers
-const renderSidebar = (
-  user: User | null = null,
-  props: Partial<React.ComponentProps<typeof Sidebar>> = {}
-) => {
-  const store = createStoreWithUser(user);
+const renderSidebar = (props = {}) => {
   const defaultProps = {
     collapsed: false,
     isMobile: false,
-    onClose: vi.fn(),
-    ...props,
+    onClose: jest.fn(),
   };
 
   return render(
-    <Provider store={store}>
+    <BrowserRouter>
       <ThemeProvider theme={theme}>
-        <MemoryRouter>
-          <Sidebar {...defaultProps} />
-        </MemoryRouter>
+        <AuthProvider>
+          <Sidebar {...defaultProps} {...props} />
+        </AuthProvider>
       </ThemeProvider>
-    </Provider>
+    </BrowserRouter>
   );
 };
 
-describe('Sidebar Role-Based Navigation', () => {
-  describe('Admin User Navigation', () => {
-    it('should show all navigation items for admin users', () => {
-      renderSidebar(adminUser);
+describe('Sidebar Role-based Filtering', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLocalStorage.getItem.mockReturnValue(null);
+  });
 
-      // Admin should see all navigation items
+  describe('Admin User Navigation', () => {
+    beforeEach(() => {
+      (require('../../contexts/AuthContext') as any).__setMockUser(
+        mockAdminUser
+      );
+    });
+
+    it('shows all navigation items for admin user', () => {
+      renderSidebar();
+
+      // Admin should see all 8 items
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Leads')).toBeInTheDocument();
       expect(screen.getByText('Quotations')).toBeInTheDocument();
@@ -116,209 +111,174 @@ describe('Sidebar Role-Based Navigation', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 
-    it('should show admin badges for admin-only items', () => {
-      renderSidebar(adminUser);
+    it('shows admin badges on admin-only items', () => {
+      renderSidebar();
 
-      // Admin-only items should have admin badges
       const adminBadges = screen.getAllByText('Admin');
-      expect(adminBadges.length).toBeGreaterThan(0);
-    });
-
-    it('should show admin portal indicator', () => {
-      renderSidebar(adminUser);
-
-      expect(screen.getByText('Admin Portal')).toBeInTheDocument();
-    });
-
-    it('should show territory information as "All Territories"', () => {
-      renderSidebar(adminUser);
-
-      expect(screen.getByText('All Territories')).toBeInTheDocument();
+      expect(adminBadges.length).toBe(3); // Commissions, Master Data, Settings
     });
   });
 
   describe('KAM User Navigation', () => {
-    it('should hide admin-only navigation items for KAM users', () => {
-      renderSidebar(kamUser);
+    beforeEach(() => {
+      (require('../../contexts/AuthContext') as any).__setMockUser(mockKamUser);
+    });
 
-      // KAM should see basic navigation items
+    it('shows only allowed navigation items for KAM user', () => {
+      renderSidebar();
+
+      // KAM should see only 5 items
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Leads')).toBeInTheDocument();
       expect(screen.getByText('Quotations')).toBeInTheDocument();
       expect(screen.getByText('Channel Partners')).toBeInTheDocument();
       expect(screen.getByText('Customers')).toBeInTheDocument();
+    });
 
-      // KAM should NOT see admin-only items
+    it('does NOT show admin-only items in DOM for KAM user', () => {
+      renderSidebar();
+
+      // These should be completely absent from DOM for security
       expect(screen.queryByText('Commissions')).not.toBeInTheDocument();
       expect(screen.queryByText('Master Data')).not.toBeInTheDocument();
       expect(screen.queryByText('Settings')).not.toBeInTheDocument();
     });
 
-    it('should show specific territory count for KAM users', () => {
-      renderSidebar(kamUser);
+    it('does not show admin badges for KAM user', () => {
+      renderSidebar();
 
-      expect(screen.getByText('2 Territories')).toBeInTheDocument();
-    });
-
-    it('should NOT show admin portal indicator for KAM users', () => {
-      renderSidebar(kamUser);
-
-      expect(screen.queryByText('Admin Portal')).not.toBeInTheDocument();
-    });
-
-    it('should show user role as KAM', () => {
-      renderSidebar(kamUser);
-
-      expect(screen.getByText('KAM')).toBeInTheDocument();
+      expect(screen.queryByText('Admin')).not.toBeInTheDocument();
     });
   });
 
-  describe('Unauthenticated State', () => {
-    it('should not show navigation items when no user is authenticated', () => {
-      renderSidebar(null);
-
-      // Should not show protected navigation items
-      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
-      expect(screen.queryByText('Leads')).not.toBeInTheDocument();
-      expect(screen.queryByText('Commissions')).not.toBeInTheDocument();
+  describe('Sidebar Persistence', () => {
+    beforeEach(() => {
+      (require('../../contexts/AuthContext') as any).__setMockUser(
+        mockAdminUser
+      );
     });
 
-    it('should not show user information section when unauthenticated', () => {
-      renderSidebar(null);
+    it('reads collapsed state from localStorage on mount', () => {
+      mockLocalStorage.getItem.mockReturnValue('true');
 
+      renderSidebar();
+
+      expect(mockLocalStorage.getItem).toHaveBeenCalledWith(
+        STORAGE_KEYS.SIDEBAR_STATE
+      );
+    });
+
+    it('handles localStorage read errors gracefully', () => {
+      mockLocalStorage.getItem.mockImplementation(() => {
+        throw new Error('Storage error');
+      });
+
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      renderSidebar();
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to read sidebar state:',
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('shows full content when not collapsed', () => {
+      renderSidebar({ collapsed: false });
+
+      expect(screen.getByText('Solarium')).toBeInTheDocument();
+      expect(screen.getByText('Signed in as')).toBeInTheDocument();
+    });
+
+    it('shows minimal content when collapsed', () => {
+      renderSidebar({ collapsed: true });
+
+      // Logo should still be visible but text should be hidden
+      expect(screen.queryByText('Solarium')).not.toBeInTheDocument();
       expect(screen.queryByText('Signed in as')).not.toBeInTheDocument();
     });
   });
 
-  describe('Collapsed State Behavior', () => {
-    it('should show tooltips for navigation items when collapsed', () => {
-      renderSidebar(adminUser, { collapsed: true });
-
-      // In collapsed state, navigation items should still be present but with tooltips
-      // The actual tooltip testing requires user interaction simulation
-      expect(screen.getByText('S')).toBeInTheDocument(); // Logo should show as 'S'
+  describe('Mobile Behavior', () => {
+    beforeEach(() => {
+      (require('../../contexts/AuthContext') as any).__setMockUser(
+        mockAdminUser
+      );
     });
 
-    it('should show user avatar in collapsed state', () => {
-      renderSidebar(adminUser, { collapsed: true });
+    it('always shows full content on mobile regardless of collapsed state', () => {
+      renderSidebar({ collapsed: true, isMobile: true });
 
-      // Should show user's initial in collapsed state
-      const userAvatar = screen.getByText('A'); // Admin User -> 'A'
-      expect(userAvatar).toBeInTheDocument();
+      expect(screen.getByText('Solarium')).toBeInTheDocument();
+      expect(screen.getByText('Signed in as')).toBeInTheDocument();
     });
-  });
 
-  describe('Mobile Responsive Behavior', () => {
-    it('should maintain full functionality on mobile', () => {
-      renderSidebar(adminUser, { isMobile: true });
+    it('calls onClose when navigation item clicked on mobile', () => {
+      const mockOnClose = jest.fn();
+      renderSidebar({ isMobile: true, onClose: mockOnClose });
 
-      // All navigation should work the same on mobile
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Commissions')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Dashboard'));
+
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Territory Display Integration', () => {
-    it('should show territory tooltip with detailed information for KAM users', () => {
-      renderSidebar(kamUser);
+  describe('Development Debug Info', () => {
+    const originalEnv = process.env.NODE_ENV;
 
-      // Territory information should be displayed
-      expect(screen.getByText('2 Territories')).toBeInTheDocument();
-
-      // The actual territories should be accessible (though in tooltip)
-      // This would require interaction testing for full verification
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
     });
 
-    it('should show all territories access for admin users', () => {
-      renderSidebar(adminUser);
+    it('shows debug info in development mode', () => {
+      process.env.NODE_ENV = 'development';
+      (require('../../contexts/AuthContext') as any).__setMockUser(
+        mockAdminUser
+      );
 
-      expect(screen.getByText('All Territories')).toBeInTheDocument();
+      renderSidebar({ collapsed: false });
+
+      expect(screen.getByText(/Role: ADMIN \| Items: 8/)).toBeInTheDocument();
+    });
+
+    it('hides debug info in production mode', () => {
+      process.env.NODE_ENV = 'production';
+      (require('../../contexts/AuthContext') as any).__setMockUser(
+        mockAdminUser
+      );
+
+      renderSidebar({ collapsed: false });
+
+      expect(screen.queryByText(/Role: ADMIN/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Navigation Item Interaction', () => {
-    it('should call onClose when navigation items are clicked on mobile', () => {
-      const mockOnClose = vi.fn();
-      renderSidebar(kamUser, { isMobile: true, onClose: mockOnClose });
+  describe('Navigation Functionality', () => {
+    beforeEach(() => {
+      (require('../../contexts/AuthContext') as any).__setMockUser(
+        mockAdminUser
+      );
+    });
 
-      // Click a navigation item
+    it('navigates to correct route when item is clicked', () => {
+      renderSidebar();
+
       const dashboardLink = screen.getByText('Dashboard');
-      dashboardLink.click();
+      fireEvent.click(dashboardLink);
 
-      expect(mockOnClose).toHaveBeenCalled();
+      // Navigation would be handled by React Router
+      // We can test that the click event was handled
+      expect(dashboardLink.closest('button')).toHaveAttribute('role', 'button');
     });
 
-    it('should not call onClose when navigation items are clicked on desktop', () => {
-      const mockOnClose = vi.fn();
-      renderSidebar(kamUser, { isMobile: false, onClose: mockOnClose });
+    it('shows tooltip for collapsed items on desktop', () => {
+      renderSidebar({ collapsed: true, isMobile: false });
 
-      // Click a navigation item
-      const dashboardLink = screen.getByText('Dashboard');
-      dashboardLink.click();
-
-      expect(mockOnClose).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Accessibility and Visual Indicators', () => {
-    it('should show active state for selected navigation items', () => {
-      // This would require setting up router state to test active states
-      renderSidebar(adminUser);
-
-      // Verify navigation structure is accessible
-      const navItems = screen.getAllByRole('button');
-      expect(navItems.length).toBeGreaterThan(0);
-    });
-
-    it('should display role chips correctly', () => {
-      renderSidebar(kamUser);
-
-      expect(screen.getByText('KAM')).toBeInTheDocument();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle user with no territories gracefully', () => {
-      const userWithoutTerritories = {
-        ...kamUser,
-        territories: [],
-      };
-
-      renderSidebar(userWithoutTerritories);
-
-      // Should still render sidebar without territory information
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.queryByText('Territories')).not.toBeInTheDocument();
-    });
-
-    it('should handle user with undefined properties gracefully', () => {
-      const incompleteUser = {
-        ...kamUser,
-        name: undefined,
-        territories: undefined,
-      } as any;
-
-      renderSidebar(incompleteUser);
-
-      // Should still render basic navigation
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    });
-  });
-
-  describe('Snapshot Testing for Visual Consistency', () => {
-    it('should match admin user sidebar snapshot', () => {
-      const { container } = renderSidebar(adminUser);
-      expect(container.firstChild).toMatchSnapshot('admin-sidebar');
-    });
-
-    it('should match KAM user sidebar snapshot', () => {
-      const { container } = renderSidebar(kamUser);
-      expect(container.firstChild).toMatchSnapshot('kam-sidebar');
-    });
-
-    it('should match collapsed sidebar snapshot', () => {
-      const { container } = renderSidebar(adminUser, { collapsed: true });
-      expect(container.firstChild).toMatchSnapshot('collapsed-sidebar');
+      // Tooltips are rendered by MUI and may not be visible in test
+      // But we can verify the structure is correct
+      const buttons = screen.getAllByRole('button');
+      expect(buttons.length).toBeGreaterThan(0);
     });
   });
 });

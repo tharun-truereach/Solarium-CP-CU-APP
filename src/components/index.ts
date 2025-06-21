@@ -1,17 +1,43 @@
 /**
- * Barrel export for components
- * Centralizes component exports for easier imports
+ * Main components barrel file for Solarium Web Portal
+ * Re-exports all component modules for easy importing
  */
-export { default as ErrorBoundary } from './error/ErrorBoundary';
-export { default as ErrorTrigger } from './error/ErrorTestComponent';
+
+// Error handling components
+export {
+  ErrorBoundary,
+  ErrorFallback,
+  FeatureErrorBoundary,
+  ErrorTestComponent,
+  GlobalErrorHandler,
+} from './error';
+
+// Loading components
+export {
+  LoadingOverlay,
+  LoadingSpinner,
+  SkeletonLoader,
+  PageLoader,
+  DataLoader,
+} from './loading';
+
+// UI components
+export { AppButton, AppModal, AppTextField, AppCard } from './ui';
+
+// Dashboard components
+export { PlaceholderCard, QuickActionTile } from './dashboard';
+
+// Global components
+export { default as GlobalErrorToast } from './GlobalErrorToast';
 export { default as GlobalLoading } from './GlobalLoading';
 export { default as SessionTimeout } from './SessionTimeout';
 export { default as EnvironmentBanner } from './EnvironmentBanner';
-export { default as ErrorFallback } from './error/ErrorFallback';
-export { default as GlobalErrorHandler } from './error/GlobalErrorHandler/index';
-export { default as GlobalErrorToast } from './GlobalErrorToast';
-// Loading components
-export * from './loading';
 
-// UI components
-export * from './ui';
+// Type exports
+export type {
+  AppButtonProps,
+  AppModalProps,
+  AppTextFieldProps,
+  AppCardProps,
+} from './ui';
+export type { PlaceholderCardProps, QuickActionTileProps } from './dashboard';

@@ -12,25 +12,55 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Coverage thresholds (must match vitest.config.ts)
-const THRESHOLDS = {
-  overall: {
-    statements: 80,
-    branches: 75,
+/**
+ * Coverage threshold configuration for SonarQube compliance
+ * Ensures minimum coverage requirements are met
+ */
+
+const coverageThresholds = {
+  global: {
+    branches: 80,
     functions: 80,
     lines: 80,
+    statements: 80,
   },
-  businessLogic: {
-    statements: 85,
-    branches: 80,
+  // Specific thresholds for critical components
+  'src/routes/ProtectedRoute.tsx': {
+    branches: 100,
+    functions: 100,
+    lines: 95,
+    statements: 95,
+  },
+  'src/utils/security.ts': {
+    branches: 90,
+    functions: 90,
+    lines: 90,
+    statements: 90,
+  },
+  'src/layout/Sidebar.tsx': {
+    branches: 85,
     functions: 85,
     lines: 85,
+    statements: 85,
   },
-  apiLayer: {
-    statements: 80,
-    branches: 75,
+  // Component categories
+  'src/components/**/*.tsx': {
+    branches: 85,
+    functions: 85,
+    lines: 85,
+    statements: 85,
+  },
+  'src/store/**/*.ts': {
+    branches: 80,
     functions: 80,
     lines: 80,
+    statements: 80,
+  },
+  'src/utils/**/*.ts': {
+    branches: 90,
+    functions: 90,
+    lines: 90,
+    statements: 90,
   },
 };
 
@@ -348,5 +378,22 @@ export {
   validateCoverage,
   calculateLayerCoverage,
   categorizeFiles,
-  THRESHOLDS,
+  coverageThresholds,
 };
+
+export const THRESHOLDS = coverageThresholds;
+
+export const collectCoverageFrom = [
+  'src/**/*.{ts,tsx}',
+  '!src/**/*.d.ts',
+  '!src/main.tsx',
+  '!src/vite-env.d.ts',
+  '!src/**/*.test.{ts,tsx}',
+  '!src/**/__tests__/**',
+  '!src/test-utils/**',
+];
+
+export const coverageReporters = ['text', 'lcov', 'html', 'json-summary'];
+
+export const coverageDirectory = 'coverage';
+export const collectCoverage = true;
