@@ -1,91 +1,93 @@
 /**
- * Territory utilities tests
- * Validates territory filtering, access control, and query injection
+ * Test suite for territory utility functions
+ * Tests territory access control, filtering, and validation logic
  */
-
 import { describe, it, expect } from 'vitest';
 import {
   getUserTerritoryAccess,
   hasTerritoryAccess,
-  hasAccessToTerritories,
-  getAccessibleTerritories,
-  filterDataByTerritory,
+  hasAnyTerritoryAccess,
   getTerritoryQueryParams,
-  injectTerritoryToParams,
-  validateTerritoryAccess,
-  TERRITORY_CONFIG,
+  getTerritoryHeaders,
+  filterByTerritory,
+  validateRouteAccess,
+  ALL_TERRITORIES,
 } from '../territory';
 import type { User, Territory } from '../../types/user.types';
 
-// Mock user data
-const mockAdminUser: User = {
+// Test users
+const adminUser: User = {
   id: '1',
   email: 'admin@test.com',
   name: 'Admin User',
   role: 'admin',
-  permissions: ['leads:read', 'leads:write'],
+  permissions: [],
   territories: [],
   isActive: true,
   isVerified: true,
-  createdAt: '2023-01-01T00:00:00Z',
-  updatedAt: '2023-01-01T00:00:00Z',
+  createdAt: '2023-01-01',
+  updatedAt: '2023-01-01',
 };
 
-const mockKamUser: User = {
+const kamUserNorth: User = {
   id: '2',
   email: 'kam@test.com',
   name: 'KAM User',
   role: 'kam',
-  permissions: ['leads:read', 'leads:write'],
-  territories: ['North', 'East'],
+  permissions: [],
+  territories: ['North', 'Northeast'],
   isActive: true,
   isVerified: true,
-  createdAt: '2023-01-01T00:00:00Z',
-  updatedAt: '2023-01-01T00:00:00Z',
+  createdAt: '2023-01-01',
+  updatedAt: '2023-01-01',
 };
 
-const mockCpUser: User = {
+const customerUser: User = {
   id: '3',
-  email: 'cp@test.com',
-  name: 'CP User',
-  role: 'cp',
-  permissions: ['leads:read'],
-  territories: ['South'],
+  email: 'customer@test.com',
+  name: 'Customer User',
+  role: 'customer',
+  permissions: [],
+  territories: [],
   isActive: true,
   isVerified: true,
-  createdAt: '2023-01-01T00:00:00Z',
-  updatedAt: '2023-01-01T00:00:00Z',
+  createdAt: '2023-01-01',
+  updatedAt: '2023-01-01',
 };
 
-// Mock data with territories
-const mockLeads = [
-  { id: '1', name: 'Lead 1', territory: 'North' as Territory },
-  { id: '2', name: 'Lead 2', territory: 'South' as Territory },
-  { id: '3', name: 'Lead 3', territory: 'East' as Territory },
-  { id: '4', name: 'Lead 4', territory: 'West' as Territory },
-  { id: '5', name: 'Lead 5' }, // No territory
+// Test data with territories
+interface TestLead {
+  id: string;
+  territory: Territory;
+  customerName: string;
+}
+
+const testLeads: TestLead[] = [
+  { id: '1', territory: 'North', customerName: 'Customer 1' },
+  { id: '2', territory: 'South', customerName: 'Customer 2' },
+  { id: '3', territory: 'Northeast', customerName: 'Customer 3' },
+  { id: '4', territory: 'West', customerName: 'Customer 4' },
 ];
 
-describe('Territory Utilities', () => {
+describe('Territory Utility Functions', () => {
   describe('getUserTerritoryAccess', () => {
     it('should return full access for admin users', () => {
-      const access = getUserTerritoryAccess(mockAdminUser);
+      const access = getUserTerritoryAccess(adminUser);
 
       expect(access.hasFullAccess).toBe(true);
-      expect(access.territories).toEqual(TERRITORY_CONFIG.ALL_TERRITORIES);
+      expect(access.territories).toEqual(ALL_TERRITORIES);
       expect(access.canAccessTerritory('North')).toBe(true);
       expect(access.canAccessTerritory('South')).toBe(true);
     });
 
     it('should return limited access for KAM users', () => {
-      const access = getUserTerritoryAccess(mockKamUser);
+      const access = getUserTerritoryAccess(kamUserNorth);
 
       expect(access.hasFullAccess).toBe(false);
-      expect(access.territories).toEqual(['North', 'East']);
+      expect(access.territories).toEqual(['North', 'Northeast']);
       expect(access.canAccessTerritory('North')).toBe(true);
-      expect(access.canAccessTerritory('East')).toBe(true);
+      expect(access.canAccessTerritory('Northeast')).toBe(true);
       expect(access.canAccessTerritory('South')).toBe(false);
-      expect(access.canAccessTerritory('West')).toBe(false);
     });
 
     it('should return no access for null user', () => {
@@ -95,20 +97,28 @@ describe('Territory Utilities', () => {
       expect(access.territories).toEqual([]);
       expect(access.canAccessTerritory('North')).toBe(false);
     });
+
+    it('should handle users with empty territories', () => {
+      const access = getUserTerritoryAccess(customerUser);
+
+      expect(access.hasFullAccess).toBe(false);
+      expect(access.territories).toEqual([]);
+      expect(access.canAccessTerritory('North')).toBe(false);
+    });
   });
 
   describe('hasTerritoryAccess', () => {
-    it('should allow admin access to all territories', () => {
-      expect(hasTerritoryAccess(mockAdminUser, 'North')).toBe(true);
-      expect(hasTerritoryAccess(mockAdminUser, 'South')).toBe(true);
-      expect(hasTerritoryAccess(mockAdminUser, 'West')).toBe(true);
+    it('should allow admin access to any territory', () => {
+      expect(hasTerritoryAccess(adminUser, 'North')).toBe(true);
+      expect(hasTerritoryAccess(adminUser, 'South')).toBe(true);
+      expect(hasTerritoryAccess(adminUser, 'West')).toBe(true);
     });
 
-    it('should allow KAM access only to assigned territories', () => {
-      expect(hasTerritoryAccess(mockKamUser, 'North')).toBe(true);
-      expect(hasTerritoryAccess(mockKamUser, 'East')).toBe(true);
-      expect(hasTerritoryAccess(mockKamUser, 'South')).toBe(false);
-      expect(hasTerritoryAccess(mockKamUser, 'West')).toBe(false);
+    it('should allow KAM access to assigned territories only', () => {
+      expect(hasTerritoryAccess(kamUserNorth, 'North')).toBe(true);
+      expect(hasTerritoryAccess(kamUserNorth, 'Northeast')).toBe(true);
+      expect(hasTerritoryAccess(kamUserNorth, 'South')).toBe(false);
+      expect(hasTerritoryAccess(kamUserNorth, 'West')).toBe(false);
     });
 
     it('should deny access for null user', () => {
@@ -116,256 +126,204 @@ describe('Territory Utilities', () => {
     });
   });
 
-  describe('hasAccessToTerritories', () => {
-    it('should allow admin access to any territory combination', () => {
-      expect(
-        hasAccessToTerritories(mockAdminUser, ['North', 'South', 'West'])
-      ).toBe(true);
+  describe('hasAnyTerritoryAccess', () => {
+    it('should return true for admin with any territories', () => {
+      expect(hasAnyTerritoryAccess(adminUser, ['North', 'South'])).toBe(true);
+      expect(hasAnyTerritoryAccess(adminUser, ['West'])).toBe(true);
     });
 
-    it('should allow KAM access only to accessible territories', () => {
-      expect(hasAccessToTerritories(mockKamUser, ['North', 'East'])).toBe(true);
-      expect(hasAccessToTerritories(mockKamUser, ['North'])).toBe(true);
-      expect(hasAccessToTerritories(mockKamUser, ['North', 'South'])).toBe(
+    it('should return true when KAM has access to at least one territory', () => {
+      expect(hasAnyTerritoryAccess(kamUserNorth, ['North', 'South'])).toBe(
+        true
+      );
+      expect(hasAnyTerritoryAccess(kamUserNorth, ['Northeast', 'West'])).toBe(
+        true
+      );
+    });
+
+    it('should return false when KAM has no access to any territory', () => {
+      expect(hasAnyTerritoryAccess(kamUserNorth, ['South', 'West'])).toBe(
         false
       );
-      expect(hasAccessToTerritories(mockKamUser, ['West'])).toBe(false);
-    });
-  });
-
-  describe('getAccessibleTerritories', () => {
-    it('should return all territories for admin', () => {
-      const territories = ['North', 'South', 'East', 'West'] as Territory[];
-      const accessible = getAccessibleTerritories(mockAdminUser, territories);
-
-      expect(accessible).toEqual(territories);
     });
 
-    it('should filter territories for KAM users', () => {
-      const territories = ['North', 'South', 'East', 'West'] as Territory[];
-      const accessible = getAccessibleTerritories(mockKamUser, territories);
-
-      expect(accessible).toEqual(['North', 'East']);
+    it('should return false for empty required territories', () => {
+      expect(hasAnyTerritoryAccess(kamUserNorth, [])).toBe(false);
     });
 
-    it('should return empty array for null user', () => {
-      const territories = ['North', 'South'] as Territory[];
-      const accessible = getAccessibleTerritories(null, territories);
-
-      expect(accessible).toEqual([]);
-    });
-  });
-
-  describe('filterDataByTerritory', () => {
-    it('should return all data for admin users', () => {
-      const filtered = filterDataByTerritory(mockLeads, mockAdminUser);
-
-      expect(filtered).toHaveLength(5);
-      expect(filtered).toEqual(mockLeads);
-    });
-
-    it('should filter data for KAM users', () => {
-      const filtered = filterDataByTerritory(mockLeads, mockKamUser);
-
-      expect(filtered).toHaveLength(3); // North, East, and no territory
-      expect(filtered.map(l => l.id)).toEqual(['1', '3', '5']);
-    });
-
-    it('should return empty array for null user', () => {
-      const filtered = filterDataByTerritory(mockLeads, null);
-
-      expect(filtered).toEqual([]);
-    });
-
-    it('should include items without territory assignment', () => {
-      const filtered = filterDataByTerritory(mockLeads, mockKamUser);
-      const noTerritoryItem = filtered.find(item => !item.territory);
-
-      expect(noTerritoryItem).toBeDefined();
-      expect(noTerritoryItem?.id).toBe('5');
+    it('should return false for null user', () => {
+      expect(hasAnyTerritoryAccess(null, ['North'])).toBe(false);
     });
   });
 
   describe('getTerritoryQueryParams', () => {
     it('should return empty params for admin users', () => {
-      const params = getTerritoryQueryParams(mockAdminUser);
-
+      const params = getTerritoryQueryParams(adminUser);
       expect(params).toEqual({});
     });
 
     it('should return territory params for KAM users', () => {
-      const params = getTerritoryQueryParams(mockKamUser);
-
+      const params = getTerritoryQueryParams(kamUserNorth);
       expect(params).toEqual({
-        territories: 'North,East',
+        territories: ['North', 'Northeast'],
       });
     });
 
-    it('should return empty territories for users with no territories', () => {
-      const userWithNoTerritories = { ...mockKamUser, territories: [] };
-      const params = getTerritoryQueryParams(userWithNoTerritories);
-
-      expect(params).toEqual({
-        territories: '',
-      });
+    it('should return empty params for users without territories', () => {
+      const params = getTerritoryQueryParams(customerUser);
+      expect(params).toEqual({});
     });
 
     it('should return empty params for null user', () => {
       const params = getTerritoryQueryParams(null);
-
       expect(params).toEqual({});
     });
   });
 
-  describe('injectTerritoryToParams', () => {
-    it('should not modify params for admin users', () => {
-      const originalParams = { page: 1, limit: 10 };
-      const enhanced = injectTerritoryToParams(originalParams, mockAdminUser);
-
-      expect(enhanced).toEqual(originalParams);
-    });
-
-    it('should add territory params for KAM users', () => {
-      const originalParams = { page: 1, limit: 10 };
-      const enhanced = injectTerritoryToParams(originalParams, mockKamUser);
-
-      expect(enhanced).toEqual({
-        page: 1,
-        limit: 10,
-        territories: 'North,East',
+  describe('getTerritoryHeaders', () => {
+    it('should return role header for admin users', () => {
+      const headers = getTerritoryHeaders(adminUser);
+      expect(headers).toEqual({
+        'X-User-Role': 'admin',
       });
     });
 
-    it('should not override existing territory params', () => {
-      const originalParams = { page: 1, territories: 'South' };
-      const enhanced = injectTerritoryToParams(originalParams, mockKamUser);
-
-      // Should prioritize injected territories
-      expect(enhanced).toEqual({
-        page: 1,
-        territories: 'North,East',
+    it('should return role and territory headers for KAM users', () => {
+      const headers = getTerritoryHeaders(kamUserNorth);
+      expect(headers).toEqual({
+        'X-User-Role': 'kam',
+        'X-User-Territories': 'North,Northeast',
       });
+    });
+
+    it('should return only role header for users without territories', () => {
+      const headers = getTerritoryHeaders(customerUser);
+      expect(headers).toEqual({
+        'X-User-Role': 'customer',
+      });
+    });
+
+    it('should return empty headers for null user', () => {
+      const headers = getTerritoryHeaders(null);
+      expect(headers).toEqual({});
     });
   });
 
-  describe('validateTerritoryAccess', () => {
-    it('should allow admin access to any territory', () => {
-      const result = validateTerritoryAccess(mockAdminUser, 'West', 'write');
-
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
+  describe('filterByTerritory', () => {
+    it('should return all data for admin users', () => {
+      const filtered = filterByTerritory(testLeads, adminUser);
+      expect(filtered).toEqual(testLeads);
+      expect(filtered.length).toBe(4);
     });
 
-    it('should allow KAM access to assigned territories', () => {
-      const result = validateTerritoryAccess(mockKamUser, 'North', 'read');
+    it('should filter data for KAM users (>80% reduction test)', () => {
+      const filtered = filterByTerritory(testLeads, kamUserNorth);
 
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
+      // KAM should only see North and Northeast leads
+      expect(filtered.length).toBe(2);
+      expect(filtered).toEqual([
+        { id: '1', territory: 'North', customerName: 'Customer 1' },
+        { id: '3', territory: 'Northeast', customerName: 'Customer 3' },
+      ]);
+
+      // Verify >80% reduction in data visibility compared to admin
+      const reductionPercentage =
+        ((testLeads.length - filtered.length) / testLeads.length) * 100;
+      expect(reductionPercentage).toBeGreaterThan(80);
     });
 
-    it('should deny KAM access to unassigned territories', () => {
-      const result = validateTerritoryAccess(mockKamUser, 'West', 'read');
-
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain(
-        'does not have access to territory: West'
-      );
+    it('should return empty array for users without territories', () => {
+      const filtered = filterByTerritory(testLeads, customerUser);
+      expect(filtered).toEqual([]);
     });
 
-    it('should check write permissions for write operations', () => {
-      const kamWithoutWritePerms: User = {
-        ...mockKamUser,
-        permissions: ['leads:read'], // No write permission
-      };
-      const result = validateTerritoryAccess(
-        kamWithoutWritePerms,
-        'North',
-        'write'
-      );
+    it('should return empty array for null user', () => {
+      const filtered = filterByTerritory(testLeads, null);
+      expect(filtered).toEqual([]);
+    });
 
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('does not have write permissions');
+    it('should handle empty data array', () => {
+      const filtered = filterByTerritory([], kamUserNorth);
+      expect(filtered).toEqual([]);
+    });
+  });
+
+  describe('validateRouteAccess', () => {
+    it('should grant access for admin users with no restrictions', () => {
+      const result = validateRouteAccess(adminUser);
+      expect(result).toEqual({ hasAccess: true });
+    });
+
+    it('should grant access when role requirements are met', () => {
+      const result = validateRouteAccess(adminUser, undefined, [
+        'admin',
+        'kam',
+      ]);
+      expect(result).toEqual({ hasAccess: true });
+    });
+
+    it('should deny access when role requirements are not met', () => {
+      const result = validateRouteAccess(kamUserNorth, undefined, ['admin']);
+      expect(result).toEqual({ hasAccess: false, reason: 'INVALID_ROLE' });
+    });
+
+    it('should grant access when territory requirements are met', () => {
+      const result = validateRouteAccess(kamUserNorth, ['North', 'West']);
+      expect(result).toEqual({ hasAccess: true });
+    });
+
+    it('should deny access when territory requirements are not met', () => {
+      const result = validateRouteAccess(kamUserNorth, ['South', 'West']);
+      expect(result).toEqual({ hasAccess: false, reason: 'INVALID_TERRITORY' });
+    });
+
+    it('should grant access when both role and territory requirements are met', () => {
+      const result = validateRouteAccess(kamUserNorth, ['Northeast'], ['kam']);
+      expect(result).toEqual({ hasAccess: true });
+    });
+
+    it('should deny access when role is valid but territory is not', () => {
+      const result = validateRouteAccess(kamUserNorth, ['South'], ['kam']);
+      expect(result).toEqual({ hasAccess: false, reason: 'INVALID_TERRITORY' });
     });
 
     it('should deny access for null user', () => {
-      const result = validateTerritoryAccess(null, 'North', 'read');
-
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toBe('User not authenticated');
+      const result = validateRouteAccess(null);
+      expect(result).toEqual({ hasAccess: false, reason: 'NO_USER' });
     });
   });
 
-  describe('Configuration', () => {
-    it('should have correct territory configuration', () => {
-      expect(TERRITORY_CONFIG.ALL_TERRITORIES).toHaveLength(9);
-      expect(TERRITORY_CONFIG.ALL_TERRITORIES).toContain('North');
-      expect(TERRITORY_CONFIG.ALL_TERRITORIES).toContain('South');
-      expect(TERRITORY_CONFIG.ALL_TERRITORIES).toContain('Central');
+  describe('Edge Cases and Boundary Conditions', () => {
+    it('should handle user with undefined territories array', () => {
+      const userWithUndefinedTerritories = {
+        ...kamUserNorth,
+        territories: undefined as any,
+      };
 
-      expect(TERRITORY_CONFIG.ADMIN_ROLES).toEqual(['admin']);
-      expect(TERRITORY_CONFIG.KAM_ROLES).toEqual(['kam']);
-      expect(TERRITORY_CONFIG.TERRITORY_DEPENDENT_ROLES).toEqual(['kam']);
-    });
-  });
-
-  describe('Data Reduction Tests', () => {
-    it('should significantly reduce data for KAM vs Admin', () => {
-      const largeMockData = Array.from({ length: 100 }, (_, i) => ({
-        id: i.toString(),
-        name: `Lead ${i}`,
-        territory: TERRITORY_CONFIG.ALL_TERRITORIES[i % 9] as Territory, // Distribute across all territories
-      }));
-
-      const adminFiltered = filterDataByTerritory(largeMockData, mockAdminUser);
-      const kamFiltered = filterDataByTerritory(largeMockData, mockKamUser);
-
-      // Admin should see all data
-      expect(adminFiltered).toHaveLength(100);
-
-      // KAM should see significantly less (only North and East territories)
-      // With 9 territories and even distribution, KAM should see ~22 items (2/9 of 100)
-      expect(kamFiltered.length).toBeLessThan(30);
-      expect(kamFiltered.length).toBeGreaterThan(15);
-
-      // Verify reduction is >80% as required
-      const reductionPercentage =
-        ((adminFiltered.length - kamFiltered.length) / adminFiltered.length) *
-        100;
-      expect(reductionPercentage).toBeGreaterThan(70); // Allow some margin due to distribution
-    });
-  });
-
-  describe('Negative Access Tests', () => {
-    it('should prove KAM cannot see out-of-scope data', () => {
-      const southOnlyData = [
-        { id: '1', name: 'South Lead 1', territory: 'South' as Territory },
-        { id: '2', name: 'South Lead 2', territory: 'South' as Territory },
-      ];
-
-      const kamFiltered = filterDataByTerritory(southOnlyData, mockKamUser);
-
-      // KAM with North/East access should see no South data
-      expect(kamFiltered).toHaveLength(0);
+      const access = getUserTerritoryAccess(userWithUndefinedTerritories);
+      expect(access.territories).toEqual([]);
+      expect(access.hasFullAccess).toBe(false);
     });
 
-    it('should prove territory query injection works for KAM', () => {
-      const params = getTerritoryQueryParams(mockKamUser);
+    it('should handle empty territory arrays in functions', () => {
+      const userWithEmptyTerritories = {
+        ...kamUserNorth,
+        territories: [],
+      };
 
-      expect(params.territories).toBe('North,East');
-      expect(params.territories).not.toContain('South');
-      expect(params.territories).not.toContain('West');
-    });
-
-    it('should prove admin requests are untouched', () => {
-      const originalParams = { search: 'test', page: 1 };
-      const adminParams = injectTerritoryToParams(
-        originalParams,
-        mockAdminUser
+      expect(hasTerritoryAccess(userWithEmptyTerritories, 'North')).toBe(false);
+      expect(hasAnyTerritoryAccess(userWithEmptyTerritories, ['North'])).toBe(
+        false
       );
+      expect(getTerritoryQueryParams(userWithEmptyTerritories)).toEqual({});
+    });
 
-      // Admin params should be identical to original
-      expect(adminParams).toEqual(originalParams);
-      expect(adminParams).not.toHaveProperty('territories');
+    it('should handle all available territories constant', () => {
+      expect(ALL_TERRITORIES).toContain('North');
+      expect(ALL_TERRITORIES).toContain('South');
+      expect(ALL_TERRITORIES).toContain('East');
+      expect(ALL_TERRITORIES).toContain('West');
+      expect(ALL_TERRITORIES.length).toBeGreaterThan(4);
     });
   });
 });

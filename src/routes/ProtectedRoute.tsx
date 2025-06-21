@@ -1,45 +1,98 @@
 /**
- * ProtectedRoute component for handling authentication and authorization
- * Redirects to login or access denied pages based on user state
+ * Enhanced ProtectedRoute component for handling authentication and authorization
+ * Supports both role-based and territory-based access control
+ * Redirects to appropriate error pages based on access violation type
  */
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { validateRouteAccess } from '../utils/territory';
+import { ROUTES } from './routes';
+import type { Territory } from '../types/user.types';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRoles?: string[];
+  requiredTerritories?: Territory[];
   redirectTo?: string;
   checkPermission?: (user: any, pathname: string) => boolean;
 }
 
+/**
+ * Enhanced ProtectedRoute component with territory-based access control
+ *
+ * Access Control Hierarchy:
+ * 1. Authentication required
+ * 2. Role-based access (if specified)
+ * 3. Territory-based access (if specified)
+ * 4. Custom permission check (if provided)
+ *
+ * @param children - Components to render if access is granted
+ * @param requiredRoles - Array of roles that can access this route
+ * @param requiredTerritories - Array of territories required for access
+ * @param redirectTo - Custom redirect path for unauthenticated users
+ * @param checkPermission - Custom permission check function
+ */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRoles = [],
-  redirectTo = '/login',
+  requiredTerritories = [],
+  redirectTo = ROUTES.LOGIN,
   checkPermission,
 }) => {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
 
-  // If not authenticated, redirect to login
+  // If not authenticated, redirect to login with return path
   if (!isAuthenticated) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // If specific roles are required, check user role
-  if (requiredRoles.length > 0 && user) {
-    const hasRequiredRole = requiredRoles.includes(user.role);
-    if (!hasRequiredRole) {
-      return <Navigate to="/access-denied" replace />;
-    }
+  // If no user data available, redirect to login
+  if (!user) {
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // Check additional permissions if checkPermission function is provided
+  // Validate route access using territory utilities
+  const accessValidation = validateRouteAccess(
+    user,
+    requiredTerritories,
+    requiredRoles
+  );
+
+  if (!accessValidation.hasAccess) {
+    // Log access attempt for security monitoring
+    console.warn(
+      `Access denied for user ${user.email} to ${location.pathname}`,
+      {
+        reason: accessValidation.reason,
+        userRole: user.role,
+        userTerritories: user.territories,
+        requiredRoles,
+        requiredTerritories,
+        timestamp: new Date().toISOString(),
+      }
+    );
+
+    // Redirect to access denied page
+    return <Navigate to={ROUTES.ACCESS_DENIED} replace />;
+  }
+
+  // Check additional custom permissions if provided
   if (checkPermission && !checkPermission(user, location.pathname)) {
-    return <Navigate to="/access-denied" replace />;
+    console.warn(
+      `Custom permission check failed for user ${user.email} to ${location.pathname}`,
+      {
+        userRole: user.role,
+        userTerritories: user.territories,
+        timestamp: new Date().toISOString(),
+      }
+    );
+
+    return <Navigate to={ROUTES.ACCESS_DENIED} replace />;
   }
 
+  // Access granted - render protected content
   return <>{children}</>;
 };
 

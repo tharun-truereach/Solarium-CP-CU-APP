@@ -1,0 +1,125 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for better relevancy of analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run type-check
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        env:
+          NODE_ENV: test
+
+      - name: Check coverage thresholds
+        run: node scripts/coverage-threshold.js
+
+      - name: SonarQube Scan
+        uses: sonarqube-quality-gate-action@master
+        with:
+          scanMetadataReportFile: coverage/sonar-report.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Upload coverage to SonarQube
+        run: |
+          npx sonar-scanner \
+            -Dsonar.projectKey=solarium-web-portal \
+            -Dsonar.organization=solarium \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.sources=src \
+            -Dsonar.tests=src \
+            -Dsonar.test.inclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx" \
+            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+            -Dsonar.coverage.exclusions="**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx,**/*.d.ts,**/test-utils/**,**/setupTests.ts" \
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+            -Dsonar.testExecutionReportPaths=coverage/test-results.json
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+
+            const coverageComment = `
+            ## 📊 Coverage Report
+
+            | Metric | Percentage | Status |
+            |--------|------------|--------|
+            | Statements | ${coverage.total.statements.pct}% | ${coverage.total.statements.pct >= 80 ? '✅' : '❌'} |
+            | Branches | ${coverage.total.branches.pct}% | ${coverage.total.branches.pct >= 75 ? '✅' : '❌'} |
+            | Functions | ${coverage.total.functions.pct}% | ${coverage.total.functions.pct >= 80 ? '✅' : '❌'} |
+            | Lines | ${coverage.total.lines.pct}% | ${coverage.total.lines.pct >= 80 ? '✅' : '❌'} |
+
+            **Target**: 80% overall, 85% business logic, 80% API layer
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: coverageComment
+            });
+
+  quality-gate:
+    name: Quality Gate Check
+    runs-on: ubuntu-latest
+    needs: sonarqube
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: SonarQube Quality Gate Check
+        uses: sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Fail if Quality Gate fails
+        if: ${{ env.SONAR_QUALITY_GATE_STATUS != 'PASSED' }}
+        run: |
+          echo "Quality Gate failed: ${{ env.SONAR_QUALITY_GATE_STATUS }}"
+          exit 1

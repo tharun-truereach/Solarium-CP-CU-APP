@@ -29,6 +29,8 @@ import {
   VisibilityOff,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppDispatch } from '../store/hooks';
+import { showToast } from '../store/slices/uiSlice';
 import { ROUTES } from '../routes/routes';
 import { VALIDATION_PATTERNS, ERROR_MESSAGES } from '../utils/constants';
 
@@ -49,7 +51,14 @@ const Login: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, error: authError, isLoading } = useAuth();
+  const dispatch = useAppDispatch();
+  const {
+    login,
+    isAuthenticated,
+    error: authError,
+    isLoading,
+    clearError,
+  } = useAuth();
 
   // Form state
   const [formValues, setFormValues] = useState<LoginFormValues>({
@@ -74,6 +83,22 @@ const Login: React.FC = () => {
     // Focus email input on component mount
     emailInputRef.current?.focus();
   }, []);
+
+  // Handle Escape key to clear errors
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        clearError();
+        setSubmitError('');
+        setFormErrors({});
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [clearError]);
 
   // Redirect if already authenticated
   if (isAuthenticated) {
@@ -109,6 +134,7 @@ const Login: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitError('');
+    clearError();
 
     if (!validateForm()) {
       // Focus first error field
@@ -122,8 +148,15 @@ const Login: React.FC = () => {
 
     // Check for account lockout
     if (isLocked) {
-      setSubmitError(
-        'Account temporarily locked due to multiple failed attempts'
+      const errorMessage =
+        'Account temporarily locked due to multiple failed attempts';
+      setSubmitError(errorMessage);
+      dispatch(
+        showToast({
+          message: errorMessage,
+          severity: 'error',
+          duration: 8000,
+        })
       );
       return;
     }
@@ -139,6 +172,15 @@ const Login: React.FC = () => {
       setLoginAttempts(0);
       setIsLocked(false);
 
+      // Show success message
+      dispatch(
+        showToast({
+          message: 'Successfully logged in!',
+          severity: 'success',
+          duration: 4000,
+        })
+      );
+
       // Redirect to intended page
       const from = location.state?.from?.pathname || ROUTES.DASHBOARD;
       navigate(from, { replace: true });
@@ -153,8 +195,17 @@ const Login: React.FC = () => {
       if (newAttempts >= 5) {
         setIsLocked(true);
         setLockoutTimer(15 * 60); // 15 minutes
-        setSubmitError(
-          'Account locked for 15 minutes due to multiple failed login attempts'
+        const lockoutMessage =
+          'Account locked for 15 minutes due to multiple failed login attempts';
+        setSubmitError(lockoutMessage);
+
+        // Show lockout error in GlobalErrorToast
+        dispatch(
+          showToast({
+            message: lockoutMessage,
+            severity: 'error',
+            duration: 0, // Don't auto-hide lockout messages
+          })
         );
 
         // Start countdown timer
@@ -164,21 +215,67 @@ const Login: React.FC = () => {
               setIsLocked(false);
               setLoginAttempts(0);
               clearInterval(timer);
+              dispatch(
+                showToast({
+                  message: 'Account unlocked. You may try logging in again.',
+                  severity: 'info',
+                  duration: 5000,
+                })
+              );
               return 0;
             }
             return prev - 1;
           });
         }, 1000);
       } else {
-        // Handle specific error types
+        // Handle specific error types and show in GlobalErrorToast
         if (errorMessage.toLowerCase().includes('email')) {
           setFormErrors({ email: errorMessage });
           emailInputRef.current?.focus();
+          dispatch(
+            showToast({
+              message: errorMessage,
+              severity: 'error',
+              duration: 6000,
+            })
+          );
         } else if (errorMessage.toLowerCase().includes('password')) {
           setFormErrors({ password: errorMessage });
           passwordInputRef.current?.focus();
+          dispatch(
+            showToast({
+              message: errorMessage,
+              severity: 'error',
+              duration: 6000,
+            })
+          );
+        } else if (errorMessage.toLowerCase().includes('locked')) {
+          setSubmitError(errorMessage);
+          dispatch(
+            showToast({
+              message: errorMessage,
+              severity: 'warning',
+              duration: 8000,
+            })
+          );
+        } else if (errorMessage.toLowerCase().includes('network')) {
+          setSubmitError(ERROR_MESSAGES.NETWORK_ERROR);
+          dispatch(
+            showToast({
+              message: ERROR_MESSAGES.NETWORK_ERROR,
+              severity: 'error',
+              duration: 8000,
+            })
+          );
         } else {
           setSubmitError(errorMessage);
+          dispatch(
+            showToast({
+              message: errorMessage,
+              severity: 'error',
+              duration: 8000,
+            })
+          );
         }
       }
 
@@ -206,6 +303,11 @@ const Login: React.FC = () => {
       if (submitError) {
         setSubmitError('');
       }
+
+      // Clear auth error when user makes changes
+      if (authError) {
+        clearError();
+      }
     };
 
   // Handle password visibility toggle
@@ -218,6 +320,11 @@ const Login: React.FC = () => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Get current error message for display
+  const getCurrentError = () => {
+    return authError || submitError;
   };
 
   return (
@@ -281,7 +388,7 @@ const Login: React.FC = () => {
             aria-label="Login form"
           >
             {/* Error Display */}
-            {(submitError || authError) && (
+            {getCurrentError() && (
               <Alert
                 ref={errorAlertRef}
                 severity="error"
@@ -290,7 +397,7 @@ const Login: React.FC = () => {
                 aria-live="assertive"
                 tabIndex={-1}
               >
-                {submitError || authError}
+                {getCurrentError()}
               </Alert>
             )}
 
@@ -309,6 +416,8 @@ const Login: React.FC = () => {
                 error={Boolean(formErrors.email)}
                 helperText={formErrors.email}
                 disabled={isLoading || isLocked}
+                aria-invalid={Boolean(formErrors.email)}
+                aria-describedby={formErrors.email ? 'email-error' : undefined}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -343,6 +452,10 @@ const Login: React.FC = () => {
                 error={Boolean(formErrors.password)}
                 helperText={formErrors.password}
                 disabled={isLoading || isLocked}
+                aria-invalid={Boolean(formErrors.password)}
+                aria-describedby={
+                  formErrors.password ? 'password-error' : undefined
+                }
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -358,6 +471,7 @@ const Login: React.FC = () => {
                         onClick={handleTogglePasswordVisibility}
                         edge="end"
                         disabled={isLoading || isLocked}
+                        tabIndex={0}
                       >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
@@ -405,15 +519,18 @@ const Login: React.FC = () => {
                 borderRadius: 2,
                 textTransform: 'none',
                 fontWeight: 600,
+                minHeight: 48, // WCAG touch target minimum
               }}
             >
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
 
+            {/* Login Attempt Counter */}
             <Typography
               variant="body2"
               color="text.secondary"
               sx={{ textAlign: 'center', mb: 3, fontSize: '0.75rem' }}
+              aria-live="polite"
             >
               {loginAttempts > 0 &&
                 !isLocked &&
@@ -435,6 +552,11 @@ const Login: React.FC = () => {
                   textDecoration: 'underline',
                   cursor: 'pointer',
                   '&:hover': { textDecoration: 'none' },
+                  minHeight: 44, // WCAG touch target minimum
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  px: 2,
+                  py: 1,
                 }}
                 aria-label="Go to forgot password page"
               >

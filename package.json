@@ -6,17 +6,24 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test": "vitest",
-    "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:ci": "vitest run --coverage --reporter=verbose --reporter=json --reporter=html",
+    "test:headers": "vitest run src/tests/security/headers.test.ts",
+    "test:accessibility": "vitest run src/pages/__tests__/*.accessibility.test.tsx",
     "type-check": "tsc --noEmit",
-    "security:headers": "npm run dev & sleep 5 && curl -I http://localhost:3000 && pkill -f vite",
+    "qa-check": "node scripts/qa-check.js",
     "security:audit": "npm audit --audit-level=moderate",
-    "security:check": "npm run lint && npm run security:audit"
+    "security:scan": "./scripts/xss-scan.sh",
+    "coverage:validate": "node scripts/coverage-threshold.js",
+    "sonar:scan": "sonar-scanner",
+    "ci:full": "npm run lint && npm run type-check && npm run test:coverage:ci && npm run coverage:validate && npm run qa-check"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -29,6 +36,7 @@
     "formik": "^2.4.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-helmet-async": "^2.0.5",
     "react-redux": "^8.1.3",
     "react-router-dom": "^6.18.0",
     "redux-persist": "^6.0.0",
@@ -47,6 +55,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vitejs/plugin-react": "^4.0.3",
+    "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.45.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.3",
@@ -56,8 +65,13 @@
     "msw": "^2.0.8",
     "node-fetch": "^3.3.2",
     "prettier": "^3.1.0",
+    "sonar-scanner": "^1.0.0",
     "typescript": "^5.0.2",
     "vite": "^4.4.5",
     "vitest": "^0.34.6"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }

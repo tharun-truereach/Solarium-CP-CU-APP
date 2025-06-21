@@ -1,535 +1,506 @@
 /**
- * Enhanced encrypted transform for Redux persistence
- * Provides AES-256 encryption with checksum verification, key rotation, and tamper detection
+ * Enhanced Encrypted Transform with SHA-256 Checksum and Tamper Detection
+ * Provides AES-256 encryption with integrity verification for Redux persistence
  */
-
 import { Transform } from 'redux-persist';
 import CryptoJS from 'crypto-js';
 import { config } from '../../config/environment';
 
 /**
- * Encrypted data structure with versioning and integrity checks
+ * Encrypted state wrapper with integrity data
  */
-interface EncryptedPayload {
-  version: number;
+interface EncryptedStateWrapper {
+  version: string;
   keyId: string;
-  checksum: string;
   timestamp: number;
+  checksum: string;
   data: string;
+  iv: string;
 }
 
 /**
- * Key rotation configuration
+ * Persistence error handlers for security events
  */
-interface KeyRotationConfig {
-  gracePeriodDays: number;
-  rotationIntervalDays: number;
-}
+export const persistenceErrorHandlers = {
+  /**
+   * Called when tamper detection is triggered
+   */
+  onTamperDetected: (reason: string) => {
+    console.error('🚨 Storage tamper detected:', reason);
 
-/**
- * Default key rotation settings
- */
-const DEFAULT_KEY_ROTATION: KeyRotationConfig = {
-  gracePeriodDays: 7,
-  rotationIntervalDays: 90,
+    // In production, you might want to:
+    // - Log to security monitoring system
+    // - Force user logout
+    // - Send alert to admin dashboard
+
+    if (typeof window !== 'undefined') {
+      // Dispatch custom event for global handling
+      window.dispatchEvent(
+        new CustomEvent('storage:tamper-detected', {
+          detail: { reason, timestamp: new Date().toISOString() },
+        })
+      );
+
+      // Clear potentially compromised storage
+      try {
+        localStorage.removeItem('persist:solarium-auth');
+        localStorage.removeItem('persist:solarium-root');
+        sessionStorage.clear();
+
+        // Force page reload to clear any compromised state
+        setTimeout(() => {
+          window.location.href = '/session-expired?reason=tamper';
+        }, 100);
+      } catch (error) {
+        console.error('Failed to clear compromised storage:', error);
+      }
+    }
+  },
+
+  /**
+   * Called when storage quota is exceeded
+   */
+  onStorageQuotaExceeded: () => {
+    console.warn('⚠️ Storage quota exceeded, cleaning up old data');
+
+    try {
+      // Clean up non-essential stored data
+      const keysToClean = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && !key.startsWith('persist:solarium')) {
+          keysToClean.push(key);
+        }
+      }
+
+      keysToClean.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.warn(`Failed to remove ${key}:`, error);
+        }
+      });
+    } catch (error) {
+      console.error('Storage cleanup failed:', error);
+    }
+  },
+
+  /**
+   * Called when decryption fails
+   */
+  onDecryptionFailure: (error: string) => {
+    console.error('🔐 Decryption failed:', error);
+
+    // This could indicate:
+    // - Key rotation without proper migration
+    // - Storage corruption
+    // - Tampering attempt
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('storage:decryption-failed', {
+          detail: { error, timestamp: new Date().toISOString() },
+        })
+      );
+    }
+  },
 };
 
 /**
- * Current encryption version
+ * Generate SHA-256 checksum for data integrity verification
  */
-const ENCRYPTION_VERSION = 2;
+const generateChecksum = (
+  data: string,
+  keyId: string,
+  timestamp: number
+): string => {
+  const checksumData = `${data}:${keyId}:${timestamp}:${config.cryptoSecret}`;
+  return CryptoJS.SHA256(checksumData).toString();
+};
 
 /**
- * Generate a deterministic key ID from the secret
+ * Verify data integrity using SHA-256 checksum
  */
-function generateKeyId(secret: string): string {
-  return CryptoJS.SHA256(secret).toString().substring(0, 8);
-}
-
-/**
- * Calculate SHA-256 checksum of data
- */
-function calculateChecksum(data: string): string {
-  return CryptoJS.SHA256(data).toString();
-}
-
-/**
- * Verify data integrity using checksum
- */
-function verifyChecksum(data: string, expectedChecksum: string): boolean {
-  const actualChecksum = calculateChecksum(data);
+const verifyChecksum = (
+  data: string,
+  keyId: string,
+  timestamp: number,
+  expectedChecksum: string
+): boolean => {
+  const actualChecksum = generateChecksum(data, keyId, timestamp);
   return actualChecksum === expectedChecksum;
-}
+};
 
 /**
- * Add checksum to state data
+ * Generate cryptographically secure key ID
  */
-export function addChecksum(state: any): any {
-  if (!state || typeof state !== 'object') {
-    return state;
-  }
-
-  const stateString = JSON.stringify(state);
-  const checksum = calculateChecksum(stateString);
-
-  return {
-    ...state,
-    _checksum: checksum,
-    _timestamp: Date.now(),
-  };
-}
+const generateKeyId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2);
+  return `${timestamp}-${random}`;
+};
 
 /**
- * Verify checksum of state data
+ * Get current crypto key with rotation support
  */
-export function verifyChecksumState(state: any): boolean {
-  if (!state || typeof state !== 'object' || !state._checksum) {
-    return false;
-  }
-
-  const { _checksum, _timestamp, ...dataWithoutChecksum } = state;
-  const dataString = JSON.stringify(dataWithoutChecksum);
-
-  return verifyChecksum(dataString, _checksum);
-}
-
-/**
- * Enhanced encrypt transform with integrity checks and key rotation
- */
-export function createEncryptedTransform(
-  secretKey: string,
-  keyRotationConfig: Partial<KeyRotationConfig> = {}
-): Transform<any, any> {
-  const rotationConfig = { ...DEFAULT_KEY_ROTATION, ...keyRotationConfig };
-
-  // Validate secret key strength
-  if (secretKey.length < 32) {
-    console.error(
-      '🚨 Encryption secret key is too weak! Use at least 32 characters.'
+const getCryptoKey = (): string => {
+  if (!config.cryptoSecret || config.cryptoSecret.length < 32) {
+    throw new Error(
+      'CRYPTO_SECRET must be at least 32 characters for security'
     );
-    throw new Error('Encryption key must be at least 32 characters long');
+  }
+  return config.cryptoSecret;
+};
+
+/**
+ * Validate encrypted state wrapper structure
+ */
+const validateStateWrapper = (
+  wrapper: any
+): wrapper is EncryptedStateWrapper => {
+  return (
+    wrapper &&
+    typeof wrapper === 'object' &&
+    typeof wrapper.version === 'string' &&
+    typeof wrapper.keyId === 'string' &&
+    typeof wrapper.timestamp === 'number' &&
+    typeof wrapper.checksum === 'string' &&
+    typeof wrapper.data === 'string' &&
+    typeof wrapper.iv === 'string'
+  );
+};
+
+/**
+ * Check if encrypted data is from an old version that needs migration
+ */
+const isLegacyFormat = (state: any): boolean => {
+  // Check if it's the old format without integrity features
+  return (
+    typeof state === 'string' ||
+    (typeof state === 'object' && !state.version && !state.checksum)
+  );
+};
+
+/**
+ * Migrate legacy encrypted data to new format with integrity checks
+ */
+const migrateLegacyData = (legacyState: any): any => {
+  console.warn(
+    '🔄 Migrating legacy encrypted data to new format with integrity checks'
+  );
+
+  try {
+    // If it's an old encrypted string, try to decrypt it
+    if (typeof legacyState === 'string') {
+      const decrypted = CryptoJS.AES.decrypt(
+        legacyState,
+        getCryptoKey()
+      ).toString(CryptoJS.enc.Utf8);
+      if (decrypted) {
+        return JSON.parse(decrypted);
+      }
+    }
+
+    // If it's an old object format, return as-is
+    if (typeof legacyState === 'object' && legacyState !== null) {
+      return legacyState;
+    }
+  } catch (error) {
+    console.error('❌ Legacy data migration failed:', error);
+    persistenceErrorHandlers.onDecryptionFailure(
+      `Legacy migration failed: ${error}`
+    );
   }
 
-  const keyId = generateKeyId(secretKey);
+  // Return undefined to trigger fresh state
+  return undefined;
+};
+
+/**
+ * Enhanced encrypted transform with integrity verification
+ * Provides AES-256 encryption with SHA-256 checksums and tamper detection
+ */
+export const createEncryptedTransform = (
+  secretKey?: string
+): Transform<any, any, any, any> => {
+  const cryptoKey = secretKey || getCryptoKey();
 
   return {
-    in: (state: any, key: string | number | symbol) => {
+    in: (inboundState: any, key: string | number | symbol): string => {
       try {
-        if (!state) return state;
-
-        // Add checksum to state before encryption
-        const stateWithChecksum = addChecksum(state);
-        const stateString = JSON.stringify(stateWithChecksum);
-
-        // Calculate checksum of the serialized state
-        const checksum = calculateChecksum(stateString);
-
-        // Encrypt the state
-        const encrypted = CryptoJS.AES.encrypt(
-          stateString,
-          secretKey
-        ).toString();
-
-        // Create encrypted payload with metadata
-        const payload: EncryptedPayload = {
-          version: ENCRYPTION_VERSION,
-          keyId,
-          checksum,
-          timestamp: Date.now(),
-          data: encrypted,
-        };
-
-        if (config.environment === 'DEV') {
-          console.log(`🔐 Encrypting state for key: ${String(key)}`);
+        if (inboundState === undefined || inboundState === null) {
+          return JSON.stringify(null);
         }
 
-        return JSON.stringify(payload);
+        // Generate encryption metadata
+        const timestamp = Date.now();
+        const keyId = generateKeyId();
+        const iv = CryptoJS.lib.WordArray.random(128 / 8);
+
+        // Serialize and encrypt the state
+        const serializedState = JSON.stringify(inboundState);
+        const encrypted = CryptoJS.AES.encrypt(serializedState, cryptoKey, {
+          iv,
+        }).toString();
+
+        // Generate integrity checksum
+        const checksum = generateChecksum(encrypted, keyId, timestamp);
+
+        // Create wrapped encrypted state with integrity data
+        const wrappedState: EncryptedStateWrapper = {
+          version: '2.0',
+          keyId,
+          timestamp,
+          checksum,
+          data: encrypted,
+          iv: iv.toString(),
+        };
+
+        const result = JSON.stringify(wrappedState);
+
+        // Validate the result can be parsed back
+        try {
+          JSON.parse(result);
+        } catch (parseError) {
+          throw new Error(`Encryption result validation failed: ${parseError}`);
+        }
+
+        return result;
       } catch (error) {
-        console.error('🚨 Encryption failed:', error);
-        // Return null to prevent storage of corrupted data
-        return null;
+        console.error('🔐 Encryption failed for key:', String(key), error);
+        throw new Error(`Encryption failed: ${error}`);
       }
     },
 
-    out: (state: string, key: string | number | symbol) => {
+    out: (outboundState: string, key: string | number | symbol): any => {
       try {
-        if (!state || typeof state !== 'string') {
-          return state;
+        if (!outboundState || outboundState === 'undefined') {
+          return undefined;
         }
 
-        let payload: EncryptedPayload;
-
+        // Parse the stored state
+        let parsedState: any;
         try {
-          payload = JSON.parse(state);
+          parsedState = JSON.parse(outboundState);
         } catch (parseError) {
-          console.error('🚨 Failed to parse encrypted payload:', parseError);
-          return null;
-        }
-
-        // Validate payload structure
-        if (!payload || typeof payload !== 'object' || !payload.data) {
-          console.error('🚨 Invalid encrypted payload structure');
-          return null;
-        }
-
-        // Check version compatibility
-        if (payload.version > ENCRYPTION_VERSION) {
-          console.error(
-            '🚨 Encrypted data version is newer than supported version'
+          console.error('❌ Failed to parse stored state:', parseError);
+          persistenceErrorHandlers.onDecryptionFailure(
+            `Parse error: ${parseError}`
           );
+          return undefined;
+        }
+
+        // Handle null values
+        if (parsedState === null) {
           return null;
         }
 
-        // Check key ID for rotation detection
-        if (payload.keyId !== keyId) {
-          console.warn('🔄 Key rotation detected, attempting to migrate data');
-
-          // Check if we're within grace period
-          const ageDays =
-            (Date.now() - (payload.timestamp || 0)) / (1000 * 60 * 60 * 24);
-          if (ageDays > rotationConfig.gracePeriodDays) {
-            console.error(
-              '🚨 Encrypted data is too old for current key, forcing logout'
-            );
-            // Trigger logout by returning null - this will be handled by the app
-            persistenceErrorHandlers.onTamperDetected(
-              'Key rotation grace period expired'
-            );
-            return null;
-          }
+        // Handle legacy format migration
+        if (isLegacyFormat(parsedState)) {
+          console.warn('🔄 Detected legacy format, attempting migration');
+          return migrateLegacyData(parsedState);
         }
 
-        // Decrypt the data
-        let decryptedString: string;
-        try {
-          const decryptedBytes = CryptoJS.AES.decrypt(payload.data, secretKey);
-          decryptedString = decryptedBytes.toString(CryptoJS.enc.Utf8);
-
-          if (!decryptedString) {
-            throw new Error('Decryption resulted in empty string');
-          }
-        } catch (decryptError) {
-          console.error('🚨 Decryption failed:', decryptError);
-          persistenceErrorHandlers.onTamperDetected('Decryption failed');
-          return null;
+        // Validate new format structure
+        if (!validateStateWrapper(parsedState)) {
+          console.error('❌ Invalid encrypted state structure');
+          persistenceErrorHandlers.onTamperDetected(
+            'Invalid state wrapper structure'
+          );
+          return undefined;
         }
 
-        // Verify checksum integrity
-        if (!verifyChecksum(decryptedString, payload.checksum)) {
+        const wrapper = parsedState as EncryptedStateWrapper;
+
+        // Verify integrity checksum
+        const isChecksumValid = verifyChecksum(
+          wrapper.data,
+          wrapper.keyId,
+          wrapper.timestamp,
+          wrapper.checksum
+        );
+
+        if (!isChecksumValid) {
           console.error(
-            '🚨 Checksum verification failed - data may have been tampered with'
+            '❌ Checksum verification failed - data may be tampered'
           );
           persistenceErrorHandlers.onTamperDetected(
             'Checksum verification failed'
           );
-          return null;
+          return undefined;
         }
 
-        // Parse and verify the decrypted state
-        let decryptedState: any;
+        // Check for suspicious timestamp (too old or future)
+        const now = Date.now();
+        const maxAge = 90 * 24 * 60 * 60 * 1000; // 90 days
+        const maxFuture = 60 * 1000; // 1 minute
+
+        if (
+          wrapper.timestamp < now - maxAge ||
+          wrapper.timestamp > now + maxFuture
+        ) {
+          console.warn(
+            '⚠️ Suspicious timestamp detected:',
+            new Date(wrapper.timestamp)
+          );
+          persistenceErrorHandlers.onTamperDetected('Suspicious timestamp');
+          return undefined;
+        }
+
+        // Decrypt the data
+        let decrypted: string;
         try {
-          decryptedState = JSON.parse(decryptedString);
-        } catch (parseError) {
-          console.error('🚨 Failed to parse decrypted state:', parseError);
-          return null;
-        }
-
-        // Verify internal checksum if present
-        if (!verifyChecksumState(decryptedState)) {
-          console.error('🚨 Internal state checksum verification failed');
-          persistenceErrorHandlers.onTamperDetected(
-            'Internal checksum verification failed'
+          const iv = CryptoJS.enc.Hex.parse(wrapper.iv);
+          const decryptedWordArray = CryptoJS.AES.decrypt(
+            wrapper.data,
+            cryptoKey,
+            { iv }
           );
-          return null;
-        }
+          decrypted = decryptedWordArray.toString(CryptoJS.enc.Utf8);
 
-        // Remove internal checksum and timestamp from state
-        const { _checksum, _timestamp, ...cleanState } = decryptedState;
-
-        if (config.environment === 'DEV') {
-          console.log(
-            `🔓 Successfully decrypted state for key: ${String(key)}`
+          if (!decrypted) {
+            throw new Error('Decryption resulted in empty string');
+          }
+        } catch (decryptError) {
+          console.error('❌ Decryption failed:', decryptError);
+          persistenceErrorHandlers.onDecryptionFailure(
+            `Decryption error: ${decryptError}`
           );
+          return undefined;
         }
 
-        return cleanState;
+        // Parse decrypted state
+        let finalState: any;
+        try {
+          finalState = JSON.parse(decrypted);
+        } catch (jsonError) {
+          console.error('❌ Failed to parse decrypted state:', jsonError);
+          persistenceErrorHandlers.onDecryptionFailure(
+            `JSON parse error: ${jsonError}`
+          );
+          return undefined;
+        }
+
+        // Additional security validation for auth state
+        if (String(key) === 'auth' && finalState) {
+          // Validate JWT token structure if present
+          if (finalState.token && typeof finalState.token === 'string') {
+            const tokenParts = finalState.token.split('.');
+            if (tokenParts.length !== 3) {
+              console.error('❌ Invalid JWT token structure in stored state');
+              persistenceErrorHandlers.onTamperDetected(
+                'Invalid JWT structure'
+              );
+              return undefined;
+            }
+          }
+
+          // Validate user object structure if present
+          if (finalState.user && typeof finalState.user === 'object') {
+            const requiredFields = ['id', 'email', 'role'];
+            const missingFields = requiredFields.filter(
+              field => !finalState.user[field]
+            );
+            if (missingFields.length > 0) {
+              console.error('❌ Invalid user object structure:', missingFields);
+              persistenceErrorHandlers.onTamperDetected('Invalid user object');
+              return undefined;
+            }
+          }
+        }
+
+        return finalState;
       } catch (error) {
-        console.error('🚨 Decryption process failed:', error);
-        persistenceErrorHandlers.onTamperDetected('Decryption process failed');
-        return null;
+        console.error('🔐 Decryption failed for key:', String(key), error);
+        persistenceErrorHandlers.onDecryptionFailure(`General error: ${error}`);
+        return undefined;
       }
     },
   };
-}
+};
 
 /**
- * Storage purge utilities
+ * Utility functions for encryption management
  */
-export const storagePurge = {
+export const encryptionUtils = {
   /**
-   * Purge all persisted data
+   * Test if current encryption is working correctly
    */
-  purgeAll: async (): Promise<void> => {
+  testEncryption: (): boolean => {
     try {
-      const keys = Object.keys(localStorage);
-      const persistKeys = keys.filter(key => key.startsWith('persist:'));
+      const transform = createEncryptedTransform();
+      const testData = { test: 'encryption-test', timestamp: Date.now() };
 
-      persistKeys.forEach(key => {
-        localStorage.removeItem(key);
-      });
+      const encrypted = transform.in(testData, 'test', {});
+      const decrypted = transform.out(encrypted, 'test', {});
 
-      console.log(`🧹 Purged ${persistKeys.length} persist keys from storage`);
+      return (
+        decrypted &&
+        decrypted.test === testData.test &&
+        decrypted.timestamp === testData.timestamp
+      );
     } catch (error) {
-      console.error('🚨 Failed to purge storage:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Purge only auth-related data
-   */
-  purgeAuth: async (): Promise<void> => {
-    try {
-      localStorage.removeItem('persist:auth');
-      localStorage.removeItem('persist:root');
-      console.log('🧹 Purged auth data from storage');
-    } catch (error) {
-      console.error('🚨 Failed to purge auth storage:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Check if persisted data exists
-   */
-  hasPersistedData: (): boolean => {
-    try {
-      const keys = Object.keys(localStorage);
-      return keys.some(key => key.startsWith('persist:'));
-    } catch (error) {
-      console.error('🚨 Failed to check persisted data:', error);
+      console.error('❌ Encryption test failed:', error);
       return false;
     }
   },
 
   /**
-   * Get total storage size
+   * Get encryption metadata from stored state
    */
-  getStorageSize: (): number => {
+  getEncryptionInfo: (
+    encryptedData: string
+  ): Partial<EncryptedStateWrapper> | null => {
     try {
-      let totalSize = 0;
-      for (const key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-          totalSize += localStorage[key].length + key.length;
-        }
+      const parsed = JSON.parse(encryptedData);
+      if (validateStateWrapper(parsed)) {
+        return {
+          version: parsed.version,
+          keyId: parsed.keyId,
+          timestamp: parsed.timestamp,
+        };
       }
-      return totalSize;
+      return null;
     } catch (error) {
-      console.error('🚨 Failed to calculate storage size:', error);
-      return 0;
+      return null;
     }
   },
 
   /**
-   * Rotate encryption secret
+   * Check if stored data needs migration
    */
-  rotateSecret: async (oldSecret: string, newSecret: string): Promise<void> => {
+  needsMigration: (encryptedData: string): boolean => {
     try {
-      console.log('🔄 Starting secret rotation...');
+      const parsed = JSON.parse(encryptedData);
+      return isLegacyFormat(parsed);
+    } catch (error) {
+      return true; // If we can't parse it, it probably needs migration
+    }
+  },
 
-      // Get all persist keys
-      const keys = Object.keys(localStorage);
-      const persistKeys = keys.filter(key => key.startsWith('persist:'));
-
-      // Decrypt with old secret and re-encrypt with new secret
-      const oldTransform = createEncryptedTransform(oldSecret);
-      const newTransform = createEncryptedTransform(newSecret);
-
-      for (const key of persistKeys) {
-        const encryptedData = localStorage.getItem(key);
-        if (encryptedData) {
-          // Decrypt with old secret
-          const decryptedData = oldTransform.out(encryptedData, key, {});
-          if (decryptedData !== null) {
-            // Re-encrypt with new secret
-            const reEncryptedData = newTransform.in(decryptedData, key, {});
-            if (reEncryptedData !== null) {
-              localStorage.setItem(key, reEncryptedData);
-            }
-          }
+  /**
+   * Clear all encrypted storage (emergency function)
+   */
+  clearAllEncryptedStorage: (): void => {
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('persist:solarium')) {
+          keysToRemove.push(key);
         }
       }
 
-      console.log('✅ Secret rotation completed');
-    } catch (error) {
-      console.error('🚨 Secret rotation failed:', error);
-      throw error;
-    }
-  },
-};
-
-/**
- * Persistence error handlers
- */
-export const persistenceErrorHandlers = {
-  /**
-   * Handle storage quota exceeded
-   */
-  onStorageQuotaExceeded: (): void => {
-    console.error('🚨 Storage quota exceeded');
-
-    // Clear old data to make space
-    try {
-      const keys = Object.keys(localStorage);
-      const persistKeys = keys.filter(key => key.startsWith('persist:'));
-
-      // Remove oldest entries first
-      persistKeys.sort((a, b) => {
-        const aData = localStorage.getItem(a);
-        const bData = localStorage.getItem(b);
-
-        try {
-          const aPayload = JSON.parse(aData || '{}');
-          const bPayload = JSON.parse(bData || '{}');
-          return (aPayload.timestamp || 0) - (bPayload.timestamp || 0);
-        } catch {
-          return 0;
-        }
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
       });
 
-      // Remove oldest 25% of entries
-      const toRemove = Math.ceil(persistKeys.length * 0.25);
-      for (let i = 0; i < toRemove && i < persistKeys.length; i++) {
-        const key = persistKeys[i];
-        if (key) {
-          localStorage.removeItem(key);
-        }
-      }
-
-      console.log(`🧹 Removed ${toRemove} old entries to free storage space`);
+      console.log('🧹 Cleared all encrypted storage');
     } catch (error) {
-      console.error('🚨 Failed to handle storage quota exceeded:', error);
-    }
-  },
-
-  /**
-   * Handle tamper detection
-   */
-  onTamperDetected: (reason: string): void => {
-    console.error(`🚨 Tamper detected: ${reason}`);
-
-    // Clear all persisted data
-    storagePurge.purgeAll().catch(console.error);
-
-    // Dispatch custom event for app to handle
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('persistence:tamper-detected', {
-          detail: { reason, timestamp: Date.now() },
-        })
-      );
-    }
-
-    // Force logout by redirecting to login
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login?reason=security';
-      }
-    }, 100);
-  },
-};
-
-/**
- * Persistence debug utilities
- */
-export const persistenceDebugUtils = {
-  /**
-   * Log persistence state
-   */
-  logPersistenceState: (): void => {
-    if (config.environment !== 'DEV') return;
-
-    console.group('🔍 Persistence State');
-    console.log('Has persisted data:', storagePurge.hasPersistedData());
-    console.log('Storage size (bytes):', storagePurge.getStorageSize());
-    console.log(
-      'Persist keys:',
-      Object.keys(localStorage).filter(k => k.startsWith('persist:'))
-    );
-    console.groupEnd();
-  },
-
-  /**
-   * Test encryption functionality
-   */
-  testEncryption: (): void => {
-    if (config.environment !== 'DEV') return;
-
-    try {
-      const testData = { test: 'encryption-test', timestamp: Date.now() };
-      const transform = createEncryptedTransform(config.cryptoSecret);
-
-      // Test encryption
-      const encrypted = transform.in(testData, 'test', {});
-      if (!encrypted) {
-        throw new Error('Encryption returned null');
-      }
-
-      // Test decryption
-      const decrypted = transform.out(encrypted, 'test', {});
-      if (!decrypted || decrypted.test !== testData.test) {
-        throw new Error('Decryption failed or data mismatch');
-      }
-
-      console.log('✅ Encryption test passed');
-    } catch (error) {
-      console.error('🚨 Encryption test failed:', error);
-    }
-  },
-
-  /**
-   * Test tamper detection
-   */
-  testTamperDetection: (): void => {
-    if (config.environment !== 'DEV') return;
-
-    try {
-      const testData = { test: 'tamper-test', timestamp: Date.now() };
-      const transform = createEncryptedTransform(config.cryptoSecret);
-
-      // Encrypt data
-      const encrypted = transform.in(testData, 'test', {});
-      if (!encrypted) return;
-
-      // Tamper with encrypted data
-      const payload = JSON.parse(encrypted);
-      payload.checksum = 'tampered-checksum';
-      const tamperedEncrypted = JSON.stringify(payload);
-
-      // Try to decrypt tampered data
-      const result = transform.out(tamperedEncrypted, 'test', {});
-
-      if (result === null) {
-        console.log('✅ Tamper detection test passed - tampered data rejected');
-      } else {
-        console.error(
-          '🚨 Tamper detection test failed - tampered data accepted'
-        );
-      }
-    } catch (error) {
-      console.error('🚨 Tamper detection test error:', error);
+      console.error('❌ Failed to clear encrypted storage:', error);
     }
   },
 };
 
-// Set up tamper detection event listener
-if (typeof window !== 'undefined') {
-  window.addEventListener('persistence:tamper-detected', (event: any) => {
-    console.error('🚨 Security Alert: Data tampering detected', event.detail);
-
-    // Additional security measures can be added here
-    // such as reporting to security service
-  });
-}
-
+// Export default transform factory
 export default createEncryptedTransform;

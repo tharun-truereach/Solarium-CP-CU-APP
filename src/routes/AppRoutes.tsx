@@ -18,6 +18,10 @@ import AccessDenied from '../pages/AccessDenied';
 import SessionExpired from '../pages/SessionExpired';
 import ServerError from '../pages/ServerError';
 
+// Password reset pages
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
+
 // Lazy imports for demonstration
 const LazyExample = lazy(() => import('../pages/LazyExample'));
 
@@ -49,6 +53,8 @@ const AppRoutes: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path={ROUTES.LOGIN} element={<Login />} />
+        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+        <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
         <Route path={ROUTES.SESSION_EXPIRED} element={<SessionExpired />} />
 
         {/* Home redirect to dashboard */}

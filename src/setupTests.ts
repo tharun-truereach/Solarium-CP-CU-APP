@@ -1,8 +1,10 @@
 /**
- * Enhanced Jest setup file for React Testing Library
- * Provides comprehensive testing utilities and mocks
+ * Test setup configuration for Vitest and React Testing Library
+ * Configures jsdom environment and extends matchers for enhanced testing
  */
+
 import '@testing-library/jest-dom';
+import 'jest-axe/extend-expect';
 
 // Set up test environment variables
 process.env.REACT_APP_ENVIRONMENT = 'DEV';
@@ -18,127 +20,48 @@ process.env.REACT_APP_VERSION = '1.0.0-test';
 process.env.REACT_APP_LOG_LEVEL = 'debug';
 process.env.REACT_APP_SHOW_REDUX_DEVTOOLS = 'true';
 
-// Mock window.matchMedia for responsive components
+// Set up Vite environment variables for tests
+process.env.VITE_ENVIRONMENT = 'DEV';
+process.env.VITE_API_BASE_URL = 'http://localhost:3001';
+
+// Mock window.matchMedia for Material-UI components
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query: any) => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
   })),
 });
 
-// Mock ResizeObserver
-global.ResizeObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
-}));
-
 // Mock IntersectionObserver
-global.IntersectionObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
 }));
 
-// Mock window.location
-const mockLocation = {
-  href: 'http://localhost:3000',
-  origin: 'http://localhost:3000',
-  pathname: '/',
-  search: '',
-  hash: '',
-  reload: jest.fn(),
-  assign: jest.fn(),
-  replace: jest.fn(),
-};
+// Mock ResizeObserver
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
 
-Object.defineProperty(window, 'location', {
-  value: mockLocation,
-  writable: true,
-});
-
-// Mock console methods for testing
-const originalError = console.error;
-const originalWarn = console.warn;
-
-beforeAll(() => {
-  console.error = (...args: any[]) => {
-    if (
-      typeof args[0] === 'string' &&
-      args[0].includes('Warning: ReactDOM.render is no longer supported')
-    ) {
-      return;
-    }
-    originalError.call(console, ...args);
-  };
-
-  console.warn = (...args: any[]) => {
-    if (
-      typeof args[0] === 'string' &&
-      (args[0].includes('componentWillMount') ||
-        args[0].includes('componentWillReceiveProps'))
-    ) {
-      return;
-    }
-    originalWarn.call(console, ...args);
-  };
-});
-
-afterAll(() => {
-  console.error = originalError;
-  console.warn = originalWarn;
-});
-
-// Global test utilities
-// @ts-expect-error: Add testUtils to global for test utilities
-global.testUtils = {
-  mockLocalStorage: () => {
-    const mockStorage = {
-      getItem: jest.fn(),
-      setItem: jest.fn(),
-      removeItem: jest.fn(),
-      clear: jest.fn(),
-    };
-    Object.defineProperty(window, 'localStorage', {
-      value: mockStorage,
-      writable: true,
-    });
-    return mockStorage;
+// Mock crypto for secure operations
+Object.defineProperty(global, 'crypto', {
+  value: {
+    randomUUID: () => 'test-uuid-' + Math.random().toString(36).substr(2, 9),
   },
+});
 
-  mockSessionStorage: () => {
-    const mockStorage = {
-      getItem: jest.fn(),
-      setItem: jest.fn(),
-      removeItem: jest.fn(),
-      clear: jest.fn(),
-    };
-    Object.defineProperty(window, 'sessionStorage', {
-      value: mockStorage,
-      writable: true,
-    });
-    return mockStorage;
-  },
-};
+console.log('✅ Test setup configured with jsdom and jest-axe');
 
-// Extend Jest matchers
 declare global {
-  interface JestMatchers<R> {
-    toBeInTheDocument(): R;
-    toHaveClass(className: string): R;
-    toHaveStyle(style: Record<string, any>): R;
-  }
-
-  // Use let instead of var for testUtils
-  let testUtils: {
-    mockLocalStorage: () => any;
-    mockSessionStorage: () => any;
-  };
+  const vi: any;
 }

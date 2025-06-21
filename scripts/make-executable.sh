@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Make all shell scripts executable
+find scripts -name "*.sh" -exec chmod +x {} \;
+
+echo "✅ All shell scripts are now executable"
+
 # Make all scripts executable
 # Run this after cloning the repository
 

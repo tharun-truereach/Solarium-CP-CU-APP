@@ -1,40 +1,31 @@
 /**
- * Territory management utilities
- * Provides territory filtering, query injection, and access control functionality
+ * Territory utility functions for access control and data filtering
+ * Provides comprehensive territory management for KAM vs Admin access patterns
  */
 
-import type {
-  User,
-  UserRole,
-  Territory,
-  TerritoryAccess,
-} from '../types/user.types';
+import type { User, Territory, TerritoryAccess } from '../types/user.types';
 
 /**
- * Territory configuration and constants
+ * All available territories in the system
  */
-export const TERRITORY_CONFIG = {
-  ALL_TERRITORIES: [
-    'North',
-    'South',
-    'East',
-    'West',
-    'Central',
-    'Northeast',
-    'Northwest',
-    'Southeast',
-    'Southwest',
-  ] as Territory[],
-
-  ADMIN_ROLES: ['admin'] as UserRole[],
-  KAM_ROLES: ['kam'] as UserRole[],
-  TERRITORY_DEPENDENT_ROLES: ['kam'] as UserRole[],
-} as const;
+export const ALL_TERRITORIES: Territory[] = [
+  'North',
+  'South',
+  'East',
+  'West',
+  'Central',
+  'Northeast',
+  'Northwest',
+  'Southeast',
+  'Southwest',
+];
 
 /**
- * Get user's territory access information
+ * Get user's territory access configuration
+ * @param user - Current user object
+ * @returns Territory access configuration
  */
-export function getUserTerritoryAccess(user: User | null): TerritoryAccess {
+export const getUserTerritoryAccess = (user: User | null): TerritoryAccess => {
   if (!user) {
     return {
       territories: [],
@@ -43,231 +34,196 @@ export function getUserTerritoryAccess(user: User | null): TerritoryAccess {
     };
   }
 
-  const hasFullAccess = TERRITORY_CONFIG.ADMIN_ROLES.includes(user.role);
-  const territories = hasFullAccess
-    ? TERRITORY_CONFIG.ALL_TERRITORIES
-    : user.territories || [];
+  // Admin has access to all territories
+  if (user.role === 'admin') {
+    return {
+      territories: ALL_TERRITORIES,
+      hasFullAccess: true,
+      canAccessTerritory: () => true,
+    };
+  }
+
+  // KAM and other roles have limited territory access
+  const userTerritories = user.territories || [];
 
   return {
-    territories,
-    hasFullAccess,
-    canAccessTerritory: (territory: Territory) => {
-      return hasFullAccess || territories.includes(territory);
-    },
+    territories: userTerritories,
+    hasFullAccess: false,
+    canAccessTerritory: (territory: Territory) =>
+      userTerritories.includes(territory),
   };
-}
+};
 
 /**
- * Check if user has territory access
+ * Check if user has access to a specific territory
+ * @param user - Current user object
+ * @param territory - Territory to check access for
+ * @returns True if user can access the territory
  */
-export function hasTerritoryAccess(
+export const hasTerritoryAccess = (
   user: User | null,
   territory: Territory
-): boolean {
+): boolean => {
   const access = getUserTerritoryAccess(user);
   return access.canAccessTerritory(territory);
-}
+};
 
 /**
- * Check if user can access multiple territories
+ * Check if user has access to any of the required territories
+ * @param user - Current user object
+ * @param requiredTerritories - Array of territories that are acceptable
+ * @returns True if user can access at least one of the required territories
  */
-export function hasAccessToTerritories(
+export const hasAnyTerritoryAccess = (
   user: User | null,
-  territories: Territory[]
-): boolean {
+  requiredTerritories: Territory[]
+): boolean => {
+  if (!user || !requiredTerritories || requiredTerritories.length === 0) {
+    return false;
+  }
+
   const access = getUserTerritoryAccess(user);
-  return territories.every(territory => access.canAccessTerritory(territory));
-}
+
+  // Admin has access to all territories
+  if (access.hasFullAccess) {
+    return true;
+  }
+
+  // Check if user has access to any of the required territories
+  return requiredTerritories.some(territory =>
+    access.canAccessTerritory(territory)
+  );
+};
 
 /**
- * Get territories that user can access from a given list
+ * Get territory query parameters for API requests (KAM filtering)
+ * @param user - Current user object
+ * @returns Query parameters object for territory filtering
  */
-export function getAccessibleTerritories(
-  user: User | null,
-  territories: Territory[]
-): Territory[] {
+export const getTerritoryQueryParams = (
+  user: User | null
+): Record<string, any> => {
+  if (!user) {
+    return {};
+  }
+
+  // Admin doesn't need territory filtering
+  if (user.role === 'admin') {
+    return {};
+  }
+
+  // KAM users need territory filtering
   const access = getUserTerritoryAccess(user);
-  return territories.filter(territory => access.canAccessTerritory(territory));
-}
+  if (access.territories.length > 0) {
+    return {
+      territories: access.territories,
+    };
+  }
+
+  return {};
+};
 
 /**
- * Filter data array by user's territory access
+ * Get territory headers for API requests
+ * @param user - Current user object
+ * @returns Headers object for territory access control
  */
-export function filterDataByTerritory<T extends { territory?: Territory }>(
+export const getTerritoryHeaders = (
+  user: User | null
+): Record<string, string> => {
+  if (!user) {
+    return {};
+  }
+
+  const headers: Record<string, string> = {
+    'X-User-Role': user.role,
+  };
+
+  // Add territory information for non-admin users
+  if (user.role !== 'admin') {
+    const access = getUserTerritoryAccess(user);
+    if (access.territories.length > 0) {
+      headers['X-User-Territories'] = access.territories.join(',');
+    }
+  }
+
+  return headers;
+};
+
+/**
+ * Filter array of data objects by territory access
+ * @param data - Array of objects with territory property
+ * @param user - Current user object
+ * @returns Filtered array containing only accessible territories
+ */
+export const filterByTerritory = <T extends { territory: Territory }>(
   data: T[],
   user: User | null
-): T[] {
+): T[] => {
+  if (!user || !data || data.length === 0) {
+    return [];
+  }
+
   const access = getUserTerritoryAccess(user);
 
+  // Admin sees all data
   if (access.hasFullAccess) {
     return data;
   }
 
-  return data.filter(item => {
-    if (!item.territory) {
-      return true; // Include items without territory assignment
-    }
-    return access.canAccessTerritory(item.territory);
-  });
-}
+  // Filter data by user's territory access
+  return data.filter(item => access.canAccessTerritory(item.territory));
+};
 
 /**
- * Build territory query parameters for API calls
+ * Validate territory access for route protection
+ * @param user - Current user object
+ * @param requiredTerritories - Territories required for route access
+ * @param requiredRoles - Roles required for route access
+ * @returns Access validation result
  */
-export function getTerritoryQueryParams(
-  user: User | null
-): Record<string, string> {
-  const access = getUserTerritoryAccess(user);
-
-  if (access.hasFullAccess) {
-    return {}; // No territory filtering for admin
-  }
-
-  if (access.territories.length === 0) {
-    return { territories: '' }; // No territories assigned
-  }
-
-  return {
-    territories: access.territories.join(','),
-  };
-}
-
-/**
- * Inject territory parameters into query object
- */
-export function injectTerritoryToParams(
-  params: Record<string, any>,
-  user: User | null
-): Record<string, any> {
-  const territoryParams = getTerritoryQueryParams(user);
-  return { ...params, ...territoryParams };
-}
-
-/**
- * Build territory filter for API headers
- */
-export function getTerritoryHeaders(user: User | null): Record<string, string> {
-  const access = getUserTerritoryAccess(user);
-
-  if (access.hasFullAccess) {
-    return {
-      'X-Territory-Access': 'all',
-    };
-  }
-
-  return {
-    'X-Territory-Access': 'filtered',
-    'X-User-Territories': access.territories.join(','),
-  };
-}
-
-/**
- * Validate territory access for data modification
- */
-export function validateTerritoryAccess(
+export const validateRouteAccess = (
   user: User | null,
-  targetTerritory: Territory,
-  operation: 'read' | 'write' | 'delete' = 'read'
-): { allowed: boolean; reason?: string } {
+  requiredTerritories?: Territory[],
+  requiredRoles?: string[]
+): {
+  hasAccess: boolean;
+  reason?: 'NO_USER' | 'INVALID_ROLE' | 'INVALID_TERRITORY';
+} => {
+  // No user authenticated
   if (!user) {
-    return {
-      allowed: false,
-      reason: 'User not authenticated',
-    };
+    return { hasAccess: false, reason: 'NO_USER' };
   }
 
-  const access = getUserTerritoryAccess(user);
-
-  if (access.hasFullAccess) {
-    return { allowed: true };
-  }
-
-  if (!access.canAccessTerritory(targetTerritory)) {
-    return {
-      allowed: false,
-      reason: `User does not have access to territory: ${targetTerritory}`,
-    };
-  }
-
-  // Additional permission checks based on operation
-  if (operation === 'write' || operation === 'delete') {
-    const hasWritePermission =
-      user.permissions.includes('leads:write') ||
-      user.permissions.includes('leads:delete');
-
-    if (!hasWritePermission) {
-      return {
-        allowed: false,
-        reason: `User does not have ${operation} permissions`,
-      };
+  // Check role access first
+  if (requiredRoles && requiredRoles.length > 0) {
+    if (!requiredRoles.includes(user.role)) {
+      return { hasAccess: false, reason: 'INVALID_ROLE' };
     }
   }
 
-  return { allowed: true };
-}
+  // Check territory access
+  if (requiredTerritories && requiredTerritories.length > 0) {
+    if (!hasAnyTerritoryAccess(user, requiredTerritories)) {
+      return { hasAccess: false, reason: 'INVALID_TERRITORY' };
+    }
+  }
+
+  return { hasAccess: true };
+};
 
 /**
- * Get territory statistics for user
- */
-export function getTerritoryStats(user: User | null): {
-  totalTerritories: number;
-  assignedTerritories: number;
-  accessibleTerritories: Territory[];
-  hasFullAccess: boolean;
-} {
-  const access = getUserTerritoryAccess(user);
-
-  return {
-    totalTerritories: TERRITORY_CONFIG.ALL_TERRITORIES.length,
-    assignedTerritories: access.territories.length,
-    accessibleTerritories: access.territories,
-    hasFullAccess: access.hasFullAccess,
-  };
-}
-
-/**
- * Format territory display name
- */
-export function formatTerritoryName(territory: Territory): string {
-  return territory;
-}
-
-/**
- * Get territory color for UI display
- */
-export function getTerritoryColor(territory: Territory): string {
-  const colorMap: Record<Territory, string> = {
-    North: '#1976d2',
-    South: '#d32f2f',
-    East: '#388e3c',
-    West: '#f57c00',
-    Central: '#7b1fa2',
-    Northeast: '#0288d1',
-    Northwest: '#1565c0',
-    Southeast: '#2e7d32',
-    Southwest: '#ef6c00',
-  };
-
-  return colorMap[territory] || '#666666';
-}
-
-/**
- * Territory utilities object for easy importing
+ * Territory utilities object for easier consumption
  */
 export const territoryUtils = {
-  getUserTerritoryAccess,
-  hasTerritoryAccess,
-  hasAccessToTerritories,
-  getAccessibleTerritories,
-  filterDataByTerritory,
-  getTerritoryQueryParams,
-  injectTerritoryToParams,
-  getTerritoryHeaders,
-  validateTerritoryAccess,
-  getTerritoryStats,
-  formatTerritoryName,
-  getTerritoryColor,
-  TERRITORY_CONFIG,
+  getAllTerritories: () => ALL_TERRITORIES,
+  getUserAccess: getUserTerritoryAccess,
+  hasAccess: hasTerritoryAccess,
+  hasAnyAccess: hasAnyTerritoryAccess,
+  getQueryParams: getTerritoryQueryParams,
+  getHeaders: getTerritoryHeaders,
+  filterData: filterByTerritory,
+  validateRoute: validateRouteAccess,
 };
 
 export default territoryUtils;

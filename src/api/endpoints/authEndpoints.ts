@@ -1,6 +1,6 @@
 /**
  * Enhanced Authentication API endpoints using RTK Query
- * Handles login, logout, token refresh, and comprehensive user management operations
+ * Handles login, logout, token refresh, password reset, and comprehensive user management operations
  */
 
 import { apiSlice } from '../apiSlice';

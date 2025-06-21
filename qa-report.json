@@ -1,0 +1,35 @@
+{
+  "timestamp": "2025-06-20T12:00:35.137Z",
+  "results": {
+    "lint": {
+      "passed": false,
+      "timestamp": "2025-06-20T12:00:07.387Z"
+    },
+    "typeCheck": {
+      "passed": false,
+      "timestamp": "2025-06-20T12:00:18.020Z"
+    },
+    "securityAudit": {
+      "passed": true,
+      "timestamp": "2025-06-20T12:00:20.852Z"
+    },
+    "xssLint": {
+      "passed": true,
+      "timestamp": "2025-06-20T12:00:20.885Z"
+    },
+    "coverage": {
+      "passed": false,
+      "timestamp": "2025-06-20T12:00:35.137Z"
+    }
+  },
+  "summary": {
+    "total": 5,
+    "passed": 2,
+    "failed": 3
+  },
+  "environment": {
+    "node": "v18.20.5",
+    "npm": "10.8.2",
+    "platform": "linux"
+  }
+}

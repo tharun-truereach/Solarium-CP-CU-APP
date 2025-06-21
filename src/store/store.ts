@@ -131,7 +131,7 @@ export const storeUtils = {
 };
 
 // Development helpers
-if (isDevelopment()) {
+if (isDevelopment() && typeof window !== 'undefined') {
   // Expose store to window for debugging
   (window as any).__REDUX_STORE__ = store;
   (window as any).__STORE_UTILS__ = storeUtils;
