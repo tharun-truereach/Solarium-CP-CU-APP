@@ -1,8 +1,9 @@
 /**
- * Jest setup file for Solarium Web Portal tests
+ * Vitest setup file for Solarium Web Portal tests
  * Configures testing library and global test utilities
  */
 import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
 // Global test configuration
 global.console = {

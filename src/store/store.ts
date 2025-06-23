@@ -19,6 +19,7 @@ import {
 import authSlice from './slices/authSlice';
 import { uiSlice } from './slices/uiSlice';
 import preferencesSlice from './slices/preferencesSlice';
+import { settingsSlice } from './slices/settingsSlice';
 
 // Import API slice
 import { apiSlice } from '../api/apiSlice';
@@ -35,6 +36,7 @@ const rootReducer = combineReducers({
   auth: authSlice,
   ui: uiSlice.reducer,
   preferences: preferencesSlice,
+  settings: settingsSlice.reducer,
   // RTK Query API slice
   [apiSlice.reducerPath]: apiSlice.reducer,
 });

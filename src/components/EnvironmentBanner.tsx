@@ -1,194 +1,153 @@
 /**
- * EnvironmentBanner component - displays current environment information
- * Shows environment name and build information for development and staging
+ * Environment Banner Component - Enhanced with Feature Flag Demo
+ * Shows environment information and demonstrates real-time feature flag updates
  */
-import React, { useState } from 'react';
-import {
-  Box,
-  Chip,
-  Typography,
-  Collapse,
-  IconButton,
-  Tooltip,
-  useTheme,
-} from '@mui/material';
-import { Info as InfoIcon, Close as CloseIcon } from '@mui/icons-material';
-import {
-  config,
-  isDevelopment,
-  isStaging,
-  getEnvironmentDisplayName,
-} from '../config/environment';
 
-export const EnvironmentBanner: React.FC = () => {
-  const theme = useTheme();
-  const [expanded, setExpanded] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+import React from 'react';
+import { Alert, Box, Chip, Typography, Fade, Paper } from '@mui/material';
+import { Warning, Analytics, BugReport, Visibility } from '@mui/icons-material';
+import { config } from '../config/environment';
+import { useFeatureFlag, useFeatureFlags } from '../hooks/useFeatureFlags';
 
-  // Only show banner in development and staging
-  if (!isDevelopment() && !isStaging()) {
+/**
+ * Environment Banner Component
+ * Demonstrates real-time feature flag propagation
+ */
+const EnvironmentBanner: React.FC = () => {
+  // Demo: Use feature flags to control banner visibility and content
+  const analyticsEnabled = useFeatureFlag('ANALYTICS');
+  const debugMode = useFeatureFlag('DEBUG_MODE');
+  const { enabledCount, flagCount, lastUpdated } = useFeatureFlags();
+
+  // Only show banner in development or when analytics is disabled
+  const shouldShowBanner = config.environment === 'DEV' || !analyticsEnabled;
+
+  if (!shouldShowBanner) {
     return null;
   }
 
-  if (dismissed) {
-    return null;
-  }
+  const getBannerSeverity = () => {
+    if (config.environment === 'DEV') return 'warning';
+    if (debugMode) return 'error';
+    return 'info';
+  };
 
-  const getColor = () => {
-    switch (config.environment) {
-      case 'DEV':
-        return 'info';
-      case 'STAGING':
-        return 'warning';
-      default:
-        return 'default';
+  const getBannerIcon = () => {
+    if (debugMode) return <BugReport />;
+    if (!analyticsEnabled) return <Visibility />;
+    return <Warning />;
+  };
+
+  const getBannerMessage = () => {
+    if (config.environment === 'DEV') {
+      return 'Development Environment - Feature flags and real-time updates are active';
     }
-  };
-
-  const getBgColor = () => {
-    switch (config.environment) {
-      case 'DEV':
-        return theme.palette.info.light;
-      case 'STAGING':
-        return theme.palette.warning.light;
-      default:
-        return theme.palette.grey[100];
+    if (debugMode) {
+      return 'Debug Mode Enabled - Additional logging and developer tools are active';
     }
-  };
-
-  const handleExpand = () => {
-    setExpanded(!expanded);
-  };
-
-  const handleDismiss = () => {
-    setDismissed(true);
+    if (!analyticsEnabled) {
+      return 'Analytics Disabled - User tracking and analytics are turned off';
+    }
+    return 'Environment Information';
   };
 
   return (
-    <Box
-      data-testid="environment-banner"
-      role="banner"
-      aria-label="Environment information"
-      sx={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        bgcolor: getBgColor(),
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        p: 1,
-        zIndex: theme.zIndex.snackbar,
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-      }}
-    >
-      <Box
+    <Fade in timeout={500}>
+      <Paper
+        elevation={2}
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 2,
-          maxWidth: 1200,
-          mx: 'auto',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1300,
+          borderRadius: 0,
+          borderBottom: '2px solid',
+          borderColor: `${getBannerSeverity()}.main`,
         }}
       >
-        {/* Environment Chip */}
-        <Chip
-          label={`ENV: ${getEnvironmentDisplayName()}`}
-          color={getColor()}
-          size="small"
-          variant="filled"
-          sx={{ fontWeight: 600 }}
-          data-testid="environment-chip"
-        />
-
-        {/* Version Info */}
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          data-testid="version-info"
-        >
-          v{config.version}
-        </Typography>
-
-        {/* Info Button */}
-        <Tooltip
-          title={expanded ? 'Hide build information' : 'Show build information'}
-        >
-          <IconButton
-            size="small"
-            onClick={handleExpand}
-            sx={{ color: 'text.secondary' }}
-            aria-label={
-              expanded ? 'Hide build information' : 'Show build information'
-            }
-            data-testid="info-button"
-          >
-            <InfoIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-
-        {/* Close Button */}
-        <Tooltip title="Dismiss banner">
-          <IconButton
-            size="small"
-            onClick={handleDismiss}
-            sx={{ color: 'text.secondary' }}
-            aria-label="Dismiss banner"
-            data-testid="dismiss-button"
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      {/* Expanded Information */}
-      <Collapse in={expanded} data-testid="expanded-info">
-        <Box
+        <Alert
+          severity={getBannerSeverity()}
+          icon={getBannerIcon()}
           sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            flexWrap: 'wrap',
-            gap: 3,
-            mt: 1,
-            py: 1,
-            borderTop: '1px solid',
-            borderColor: 'divider',
+            borderRadius: 0,
+            '& .MuiAlert-message': {
+              width: '100%',
+            },
           }}
         >
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            data-testid="build-info"
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              width: '100%',
+            }}
           >
-            <strong>Build:</strong> {config.buildNumber}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            data-testid="api-info"
-          >
-            <strong>API:</strong> {config.apiBaseUrl}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            data-testid="session-info"
-          >
-            <strong>Session:</strong> {config.sessionTimeoutMinutes}min
-          </Typography>
-          {config.enableDebugTools && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              data-testid="debug-info"
-            >
-              <strong>Debug:</strong> Enabled
-            </Typography>
-          )}
-        </Box>
-      </Collapse>
-    </Box>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {getBannerMessage()}
+              </Typography>
+              {config.environment === 'DEV' && (
+                <Typography
+                  variant="caption"
+                  sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}
+                >
+                  Environment: {config.environment} • API: {config.apiBaseUrl} •
+                  Feature Flags: {enabledCount}/{flagCount} enabled
+                  {lastUpdated &&
+                    ` • Last updated: ${new Date(lastUpdated).toLocaleTimeString()}`}
+                </Typography>
+              )}
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {/* Environment Chip */}
+              <Chip
+                label={config.environment}
+                size="small"
+                color={config.environment === 'PROD' ? 'success' : 'warning'}
+                variant="filled"
+                sx={{ fontWeight: 600, fontSize: '0.75rem' }}
+              />
+
+              {/* Analytics Chip */}
+              <Chip
+                icon={<Analytics sx={{ fontSize: 14 }} />}
+                label={analyticsEnabled ? 'Analytics ON' : 'Analytics OFF'}
+                size="small"
+                color={analyticsEnabled ? 'success' : 'default'}
+                variant="outlined"
+                sx={{ fontSize: '0.75rem' }}
+              />
+
+              {/* Debug Mode Chip */}
+              {debugMode && (
+                <Chip
+                  icon={<BugReport sx={{ fontSize: 14 }} />}
+                  label="Debug Mode"
+                  size="small"
+                  color="error"
+                  variant="filled"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              )}
+
+              {/* Feature Flag Count Chip */}
+              {config.environment === 'DEV' && (
+                <Chip
+                  label={`${enabledCount}/${flagCount} flags`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              )}
+            </Box>
+          </Box>
+        </Alert>
+      </Paper>
+    </Fade>
   );
 };
 

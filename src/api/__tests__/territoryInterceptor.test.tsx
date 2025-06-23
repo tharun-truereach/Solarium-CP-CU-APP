@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { rest } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
@@ -61,29 +61,31 @@ const testApiSlice = apiSlice.injectEndpoints({
 let capturedRequests: any[] = [];
 
 const server = setupServer(
-  http.get('/api/v1/leads', ({ request }) => {
-    const url = new URL(request.url);
+  rest.get('/api/v1/leads', (req, res, ctx) => {
+    const url = new URL(req.url);
     capturedRequests.push({
-      url: request.url.toString(),
+      url: req.url.toString(),
       searchParams: Object.fromEntries(url.searchParams.entries()),
-      headers: Object.fromEntries(request.headers.entries()),
+      headers: Object.fromEntries(req.headers.entries()),
     });
 
-    return HttpResponse.json([
-      { id: '1', name: 'Lead 1', territory: 'North' },
-      { id: '2', name: 'Lead 2', territory: 'East' },
-    ]);
+    return res(
+      ctx.json([
+        { id: '1', name: 'Lead 1', territory: 'North' },
+        { id: '2', name: 'Lead 2', territory: 'East' },
+      ])
+    );
   }),
 
-  http.get('/api/v1/quotations', ({ request }) => {
-    const url = new URL(request.url);
+  rest.get('/api/v1/quotations', (req, res, ctx) => {
+    const url = new URL(req.url);
     capturedRequests.push({
-      url: request.url.toString(),
+      url: req.url.toString(),
       searchParams: Object.fromEntries(url.searchParams.entries()),
-      headers: Object.fromEntries(request.headers.entries()),
+      headers: Object.fromEntries(req.headers.entries()),
     });
 
-    return HttpResponse.json([{ id: '1', name: 'Quote 1' }]);
+    return res(ctx.json([{ id: '1', name: 'Quote 1' }]));
   })
 );
 

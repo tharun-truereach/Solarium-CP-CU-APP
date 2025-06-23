@@ -12,6 +12,9 @@ export * from './error.types';
 // Circuit Breaker types
 export * from './circuitBreaker.types';
 
+// Settings types
+export * from './settings.types';
+
 // Common/shared types (to be implemented in future tasks)
 // export * from './common';
 // export * from './api';

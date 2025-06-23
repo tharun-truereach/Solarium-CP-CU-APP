@@ -2,7 +2,7 @@
  * Root App component for Solarium Web Portal (WEBPRT)
  * Enhanced with environment configuration and build information
  */
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -18,6 +18,8 @@ import DebugConsole from './components/DebugConsole';
 import { SolariumThemeProvider } from './theme/ThemeProvider';
 import { store, persistor } from './store';
 import { useHttpClient } from './hooks/useHttpClient';
+import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
+import { FeatureFlagDebugger } from './components';
 
 const PersistenceLoadingComponent: React.FC = () => (
   <Box
@@ -44,35 +46,40 @@ const HttpClientInitializer: React.FC<{ children: React.ReactNode }> = ({
 
 const App: React.FC = () => {
   return (
-    <Provider store={store}>
-      <PersistGate
-        loading={<PersistenceLoadingComponent />}
-        persistor={persistor}
-      >
-        <SolariumThemeProvider>
-          <CssBaseline />
-          <ErrorBoundary>
-            <BrowserRouter>
-              <HttpClientInitializer>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <PersistGate
+          loading={<PersistenceLoadingComponent />}
+          persistor={persistor}
+        >
+          <FeatureFlagProvider>
+            <SolariumThemeProvider>
+              <CssBaseline />
+              <AuthProvider>
                 <LoadingProvider>
-                  <AuthProvider>
-                    <AppRoutes />
-                    <GlobalLoading />
-                    <SessionTimeout
-                      warningTimeMinutes={5}
-                      sessionTimeoutMinutes={30}
-                      checkIntervalSeconds={60}
-                    />
-                    <EnvironmentBanner />
-                    <DebugConsole />
-                  </AuthProvider>
+                  <Suspense fallback={<PersistenceLoadingComponent />}>
+                    <BrowserRouter>
+                      <HttpClientInitializer>
+                        <EnvironmentBanner />
+                        <AppRoutes />
+                        <GlobalLoading />
+                        <SessionTimeout
+                          warningTimeMinutes={5}
+                          sessionTimeoutMinutes={30}
+                          checkIntervalSeconds={60}
+                        />
+                        <DebugConsole />
+                        <FeatureFlagDebugger />
+                      </HttpClientInitializer>
+                    </BrowserRouter>
+                  </Suspense>
                 </LoadingProvider>
-              </HttpClientInitializer>
-            </BrowserRouter>
-          </ErrorBoundary>
-        </SolariumThemeProvider>
-      </PersistGate>
-    </Provider>
+              </AuthProvider>
+            </SolariumThemeProvider>
+          </FeatureFlagProvider>
+        </PersistGate>
+      </Provider>
+    </ErrorBoundary>
   );
 };
 

@@ -41,3 +41,18 @@ export type {
   AppCardProps,
 } from './ui';
 export type { PlaceholderCardProps, QuickActionTileProps } from './dashboard';
+
+// Settings components
+export * from './settings';
+
+// Environment and utility components
+export { default as DebugConsole } from './DebugConsole';
+
+// Feature flag components
+export {
+  FeatureFlagProvider,
+  WithFeatureFlag,
+  FeatureFlagDebugger,
+} from '../contexts/FeatureFlagContext';
+
+console.log('📦 Components barrel loaded');

@@ -16,6 +16,7 @@ import {
 } from 'redux-persist';
 import authSlice from './slices/authSlice';
 import uiSlice from './slices/uiSlice';
+import settingsSlice from './slices/settingsSlice'; // NEW: Non-persisted settings slice
 import { authPersistConfig, persistenceUtils } from './persistConfig';
 import { apiSlice } from '../api/apiSlice';
 import { errorMiddleware } from './middleware/errorMiddleware';
@@ -24,6 +25,7 @@ import { errorMiddleware } from './middleware/errorMiddleware';
 const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authSlice),
   ui: uiSlice, // UI slice is not persisted
+  settings: settingsSlice, // NEW: Settings slice is not persisted (refreshed from API)
   [apiSlice.reducerPath]: apiSlice.reducer,
 });
 
@@ -87,4 +89,4 @@ export { listenerMiddleware, listenerUtils } from './listenerMiddleware';
 // API slice
 export { apiSlice } from '../api/apiSlice';
 
-console.log('📦 Store module exports ready');
+console.log('📦 Store module exports ready (with settings slice)');

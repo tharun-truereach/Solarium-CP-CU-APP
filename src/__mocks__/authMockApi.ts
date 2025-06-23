@@ -3,7 +3,11 @@
  * Provides realistic login flow with different user roles
  */
 import { rest } from 'msw';
-import type { User, LoginCredentials, LoginResponse } from '../types';
+import type {
+  User,
+  LoginCredentials,
+  LoginResponse,
+} from '../types/user.types';
 
 // Mock user data for different roles
 const mockUsers: Record<string, User> = {
@@ -107,12 +111,23 @@ const generateMockToken = (user: User): string => {
  */
 export const authMockHandlers = [
   // Login endpoint - match the expected API format
-  rest.post('*/api/v1/auth/login', async (req, res, ctx) => {
+  rest.post(/.*\/api\/v1\/auth\/login$/, async (req, res, ctx) => {
     console.log('🎯 MSW: Login handler called!', req.url.href);
 
     try {
-      const body = (await req.json()) as LoginCredentials;
+      // Check if request has body content
+      const text = await req.text();
+      console.log('📄 Raw request body:', text);
 
+      if (!text || text.trim() === '') {
+        console.log('❌ Empty request body');
+        return res(
+          ctx.status(400),
+          ctx.json({ message: 'Request body is empty' })
+        );
+      }
+
+      const body = JSON.parse(text) as LoginCredentials;
       console.log('🔐 Mock login attempt:', body.email);
 
       // Simulate network delay
@@ -169,14 +184,14 @@ export const authMockHandlers = [
   }),
 
   // Logout endpoint
-  rest.post('*/api/v1/auth/logout', (req, res, ctx) => {
+  rest.post(/.*\/api\/v1\/auth\/logout$/, (req, res, ctx) => {
     console.log('🎯 MSW: Logout handler called!', req.url.href);
     console.log('🔐 Mock logout successful');
     return res(ctx.json({ message: 'Logout successful' }));
   }),
 
   // Token refresh endpoint
-  rest.post('*/api/v1/auth/refresh', (req, res, ctx) => {
+  rest.post(/.*\/api\/v1\/auth\/refresh$/, (req, res, ctx) => {
     console.log('🎯 MSW: Refresh handler called!', req.url.href);
     const newToken = `refreshed_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newRefreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -192,7 +207,7 @@ export const authMockHandlers = [
   }),
 
   // Get current user endpoint
-  rest.get('*/api/v1/auth/me', (req, res, ctx) => {
+  rest.get(/.*\/api\/v1\/auth\/me$/, (req, res, ctx) => {
     console.log('🎯 MSW: Get user handler called!', req.url.href);
     const authHeader = req.headers.get('authorization');
 
@@ -214,7 +229,7 @@ export const authMockHandlers = [
   }),
 
   // Token verification endpoint
-  rest.get('*/api/v1/auth/verify', (req, res, ctx) => {
+  rest.get(/.*\/api\/v1\/auth\/verify$/, (req, res, ctx) => {
     console.log('🎯 MSW: Verify handler called!', req.url.href);
     const authHeader = req.headers.get('authorization');
 

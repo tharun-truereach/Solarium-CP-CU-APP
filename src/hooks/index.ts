@@ -12,9 +12,12 @@ export {
   useDashboardMetricsWithRefresh,
   useDashboardMetricsByRole,
 } from './useDashboardMetrics';
+export { useAuditLogs } from './useAuditLogs';
 
 // Export types
 export type {
   UseDashboardMetricsReturn,
   UseDashboardMetricsOptions,
 } from './useDashboardMetrics';
+
+export { useAppDispatch, useAppSelector } from '../store/hooks';
