@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGetSettingsQuery } from '../../api/endpoints/settingsEndpoints';
+import { AuditLogTable } from '../../components/settings';
 
 /**
  * Tab panel component for consistent tab content structure
@@ -590,27 +591,78 @@ const SettingsPage: React.FC = () => {
 
           {/* Audit Log Tab */}
           <SettingsTabPanel value={activeTab} index={4}>
-            <Box sx={{ px: 3 }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 600,
-                  mb: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                }}
-              >
-                <AuditIcon color="primary" />
-                Audit Log
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                View detailed history of configuration changes and
-                administrative activities.
-              </Typography>
+            {isLoading ? (
+              <SettingsSkeleton />
+            ) : isError ? (
+              // <SettingsError error={error} onRetry={handleRefresh} />
+              <Box sx={{ px: 3 }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <AuditIcon color="primary" />
+                  Audit Log
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 4 }}
+                >
+                  View detailed history of configuration changes and
+                  administrative activities.
+                </Typography>
 
-              <ComingSoon tabInfo={settingsTabs[4]!} />
-            </Box>
+                {/* Actual Audit Log Table */}
+                <AuditLogTable
+                  height={600}
+                  enableVirtualization={true}
+                  onViewDetails={log => {
+                    console.log('View audit log details:', log);
+                    // TODO: Implement audit log details modal
+                  }}
+                />
+              </Box>
+            ) : (
+              <Box sx={{ px: 3 }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <AuditIcon color="primary" />
+                  Audit Log
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 4 }}
+                >
+                  View detailed history of configuration changes and
+                  administrative activities.
+                </Typography>
+
+                {/* Actual Audit Log Table */}
+                <AuditLogTable
+                  height={600}
+                  enableVirtualization={true}
+                  onViewDetails={log => {
+                    console.log('View audit log details:', log);
+                    // TODO: Implement audit log details modal
+                  }}
+                />
+              </Box>
+            )}
           </SettingsTabPanel>
         </Box>
       </Paper>

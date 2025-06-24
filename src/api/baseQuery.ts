@@ -42,7 +42,25 @@ export const baseQuery: BaseQueryFn<
       );
     }
 
-    console.log(`🌐 RTK Query request: ${method} ${url}`);
+    console.log(`🌐 RTK Query request: ${method} ${url}`, {
+      data,
+      dataType: typeof data,
+      dataStringified: data ? JSON.stringify(data) : 'NO DATA',
+      params,
+      headers,
+    });
+
+    // Extra debugging for empty data
+    if (
+      !data &&
+      (method === 'POST' || method === 'PUT' || method === 'PATCH')
+    ) {
+      console.error('🚨 EMPTY DATA in RTK Query baseQuery!', {
+        url,
+        method,
+        originalData: data,
+      });
+    }
 
     // Make request using shared Axios instance
     // All interceptors (auth, retry, circuit breaker) are handled by the shared instance

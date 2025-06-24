@@ -15,6 +15,13 @@ import './components/error/ErrorFallback.css';
 import './routes/routing.css';
 import './components/loading/loading.css';
 
+// Initialize base query with Axios client
+import { initializeBaseQuery } from './api/baseQuery';
+import { axiosClient } from './services/http/axiosClient';
+
+// Initialize the base query immediately
+initializeBaseQuery(axiosClient);
+
 // Start the app
 const startApp = () => {
   console.log('🚀 Starting React application...');

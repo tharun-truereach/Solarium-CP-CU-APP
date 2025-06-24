@@ -22,6 +22,9 @@ import ServerError from '../pages/ServerError';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 
+// Settings page
+import SettingsPage from '../pages/settings/SettingsPage';
+
 // Lazy imports for demonstration
 const LazyExample = lazy(() => import('../pages/LazyExample'));
 
@@ -180,12 +183,7 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute requiredRoles={['admin']}>
               <MainLayout>
-                <div className="placeholder-page">
-                  <h1>System Settings</h1>
-                  <p>
-                    Admin-only page. This will be implemented in future tasks.
-                  </p>
-                </div>
+                <SettingsPage />
               </MainLayout>
             </ProtectedRoute>
           }

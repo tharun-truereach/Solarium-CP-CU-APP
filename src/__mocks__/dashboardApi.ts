@@ -87,7 +87,21 @@ export const dashboardMockHandlers = [
     // Extract user role from request headers (in real app, from JWT)
     const userRole = req.headers.get('x-user-role') || 'kam';
 
+    console.log('🎭 MSW: Dashboard metrics request', {
+      userRole,
+      headers: Object.fromEntries(req.headers.entries()),
+      url: req.url.toString(),
+    });
+
     const metrics = generateMockMetrics(userRole);
+
+    console.log('📊 MSW: Generated dashboard metrics', {
+      userRole,
+      activeLeads: metrics.activeLeads,
+      pendingQuotations: metrics.pendingQuotations,
+      channelPartners: metrics.channelPartners,
+      recentActivities: metrics.recentActivities.length,
+    });
 
     return res(ctx.json(metrics));
   }),

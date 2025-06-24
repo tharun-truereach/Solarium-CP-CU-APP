@@ -3,13 +3,14 @@
  * Automatically injects territory parameters for KAM users
  */
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../store/store';
 import { config } from '../config/environment';
 import {
   getTerritoryQueryParams,
   getTerritoryHeaders,
 } from '../utils/territory';
+import { baseQueryWithReauth } from './baseQuery';
 
 export const API_TAG_TYPES = [
   'Auth',
@@ -28,65 +29,38 @@ export const API_TAG_TYPES = [
 export type ApiTagType = (typeof API_TAG_TYPES)[number];
 
 /**
- * Enhanced base query with territory injection
+ * Enhanced base query wrapper with territory injection
  */
-const baseQueryWithTerritoryInjection = fetchBaseQuery({
-  baseUrl: config.apiBaseUrl,
+const baseQueryWithTerritoryInjection = async (
+  args: any,
+  api: any,
+  extraOptions: any
+) => {
+  const state = api.getState() as RootState;
+  const user = state.auth.user;
 
-  prepareHeaders: (headers, { getState }) => {
-    const state = getState() as RootState;
-    const user = state.auth.user;
-    const token = state.auth.token;
-
-    // Add authorization header
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
-
-    // Add territory headers for access control
+  // Add territory headers for access control
+  if (user) {
     const territoryHeaders = getTerritoryHeaders(user);
-    Object.entries(territoryHeaders).forEach(([key, value]) => {
-      headers.set(key, value);
-    });
+    args.headers = { ...args.headers, ...territoryHeaders };
+  }
 
-    // Add client info
-    headers.set('X-Client-Type', 'web-portal');
-    headers.set('X-Client-Version', config.version);
+  // Add client info headers
+  args.headers = {
+    ...args.headers,
+    'X-Client-Type': 'web-portal',
+    'X-Client-Version': config.version,
+  };
 
-    return headers;
-  },
+  // Inject territory parameters for KAM users
+  if (user && user.role === 'kam' && args.params) {
+    const territoryParams = getTerritoryQueryParams(user);
+    args.params = { ...args.params, ...territoryParams };
+  }
 
-  paramsSerializer: params => {
-    const state = (window as any).__STORE__?.getState() as RootState;
-    const user = state?.auth?.user;
-
-    // Inject territory parameters for KAM users
-    if (user && user.role === 'kam') {
-      const territoryParams = getTerritoryQueryParams(user);
-      const enhancedParams = { ...params, ...territoryParams };
-
-      // Convert to URLSearchParams
-      const searchParams = new URLSearchParams();
-      Object.entries(enhancedParams).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          searchParams.append(key, String(value));
-        }
-      });
-
-      return searchParams.toString();
-    }
-
-    // Default serialization for admin and other roles
-    const searchParams = new URLSearchParams();
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        searchParams.append(key, String(value));
-      }
-    });
-
-    return searchParams.toString();
-  },
-});
+  // Use our custom baseQuery with Axios
+  return baseQueryWithReauth(args, api, extraOptions);
+};
 
 export const apiSlice = createApi({
   reducerPath: 'api',

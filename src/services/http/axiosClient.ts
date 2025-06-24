@@ -137,6 +137,15 @@ axiosClient.interceptors.request.use(
       if (token && axiosConfig.headers) {
         axiosConfig.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Add user role header for mock API in development
+      if (
+        config.environment === 'DEV' &&
+        state.auth.user?.role &&
+        axiosConfig.headers
+      ) {
+        axiosConfig.headers['x-user-role'] = state.auth.user.role;
+      }
     }
 
     // Update user activity for authenticated requests
@@ -157,9 +166,20 @@ axiosClient.interceptors.request.use(
               : axiosConfig.data instanceof URLSearchParams
                 ? 'URLSearchParams'
                 : axiosConfig.data,
+          dataType: typeof axiosConfig.data,
+          dataStringified: JSON.stringify(axiosConfig.data),
           metadata: enhancedConfig.metadata,
         }
       );
+
+      // Extra debugging for empty data
+      if (!axiosConfig.data || axiosConfig.data === '') {
+        console.error('🚨 EMPTY REQUEST BODY DETECTED in Axios!', {
+          url: axiosConfig.url,
+          method: axiosConfig.method,
+          originalData: axiosConfig.data,
+        });
+      }
     }
 
     return axiosConfig;
