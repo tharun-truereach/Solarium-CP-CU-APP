@@ -24,6 +24,8 @@ export const API_TAG_TYPES = [
   'Ticket',
   'Settings',
   'AuditLog',
+  'Profile',
+  'Notification',
 ] as const;
 
 export type ApiTagType = (typeof API_TAG_TYPES)[number];

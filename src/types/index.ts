@@ -15,6 +15,24 @@ export * from './circuitBreaker.types';
 // Settings types
 export * from './settings.types';
 
+// Notification types
+export * from './notification.types';
+
+// Profile types (explicit exports to avoid conflicts with user.types)
+export type {
+  UserProfile,
+  AvatarUploadResponse,
+  Notification as ProfileNotification,
+  ProfileApiError,
+} from './profile.types';
+
+// Re-export profile-specific versions with different names to avoid conflicts
+export type {
+  PasswordChangePayload as ProfilePasswordChangePayload,
+  ProfileUpdatePayload as ProfileUpdateRequest,
+  PasswordChangeResponse,
+} from './profile.types';
+
 // Common/shared types (to be implemented in future tasks)
 // export * from './common';
 // export * from './api';

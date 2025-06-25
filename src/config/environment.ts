@@ -32,6 +32,9 @@ export interface EnvironmentConfig {
   // Debug Settings
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   showReduxDevtools: boolean;
+
+  // Notification Configuration
+  notificationPollInterval: number;
 }
 
 /**
@@ -134,6 +137,13 @@ export const config: EnvironmentConfig = {
     | 'warn'
     | 'error',
   showReduxDevtools: getEnvVar('VITE_SHOW_REDUX_DEVTOOLS', true, toBool),
+
+  // Notification polling configuration
+  notificationPollInterval: getEnvVar(
+    'VITE_NOTIFICATION_POLL_MS',
+    30000,
+    toNumber
+  ),
 };
 
 /**

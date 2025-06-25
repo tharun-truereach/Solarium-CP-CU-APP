@@ -53,7 +53,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // Validate route access using territory utilities
+  // Special handling for routes accessible to all authenticated users
+  const publicAuthenticatedRoutes = [ROUTES.MY_PROFILE, ROUTES.NOTIFICATIONS];
+
+  // If this is a public authenticated route, allow access for any authenticated user
+  if (publicAuthenticatedRoutes.includes(location.pathname as any)) {
+    console.log(
+      `✅ Allowing access to public authenticated route: ${location.pathname} for user: ${user.email}`
+    );
+    return <>{children}</>;
+  }
+
+  // For other routes, validate using existing logic
   const accessValidation = validateRouteAccess(
     user,
     requiredTerritories,

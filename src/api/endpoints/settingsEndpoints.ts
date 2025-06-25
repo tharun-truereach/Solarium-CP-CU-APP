@@ -22,7 +22,7 @@ export const settingsEndpoints = apiSlice.injectEndpoints({
      */
     getSettings: builder.query<SystemSettings, void>({
       query: () => ({
-        url: '/api/v1/settings',
+        url: '/settings',
         method: 'GET',
       }),
       providesTags: ['Settings'],
@@ -56,7 +56,7 @@ export const settingsEndpoints = apiSlice.injectEndpoints({
      */
     updateSettings: builder.mutation<SystemSettings, SettingsUpdatePayload>({
       query: settingsData => ({
-        url: '/api/v1/settings',
+        url: '/settings',
         method: 'PATCH',
         body: settingsData,
       }),
@@ -137,7 +137,7 @@ export const settingsEndpoints = apiSlice.injectEndpoints({
         if (dateTo) params.append('dateTo', dateTo);
 
         return {
-          url: `/api/v1/settings/audit?${params.toString()}`,
+          url: `/settings/audit?${params.toString()}`,
           method: 'GET',
         };
       },
