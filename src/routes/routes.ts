@@ -21,6 +21,8 @@ export const ROUTES = {
   COMMISSIONS: '/commissions',
   MASTER_DATA: '/master-data',
   SETTINGS: '/settings',
+  MY_PROFILE: '/my-profile',
+  NOTIFICATIONS: '/notifications',
 
   // Error routes
   NOT_FOUND: '/404',
@@ -150,6 +152,24 @@ export const ROUTE_INFO: Record<string, RouteInfo> = {
     showInNavigation: true,
     icon: 'Settings',
     description: 'System settings and configuration',
+  },
+  [ROUTES.MY_PROFILE]: {
+    path: ROUTES.MY_PROFILE,
+    title: 'My Profile',
+    requiresAuth: true,
+    allowedRoles: ['admin', 'kam', 'cp', 'customer'], // All authenticated users
+    showInNavigation: false, // Shown in header dropdown, not sidebar
+    icon: 'Person',
+    description: 'User profile management and settings',
+  },
+  [ROUTES.NOTIFICATIONS]: {
+    path: ROUTES.NOTIFICATIONS,
+    title: 'Notifications',
+    requiresAuth: true,
+    allowedRoles: ['admin', 'kam', 'cp', 'customer'], // All authenticated users
+    showInNavigation: false, // Shown in header, not sidebar
+    icon: 'Notifications',
+    description: 'System notifications and alerts',
   },
   [ROUTES.SESSION_EXPIRED]: {
     path: ROUTES.SESSION_EXPIRED,

@@ -25,6 +25,10 @@ import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 // Settings page
 import SettingsPage from '../pages/settings/SettingsPage';
 
+// Profile page
+import MyProfilePage from '../pages/MyProfilePage';
+import NotificationsPage from '../pages/NotificationsPage';
+
 // Lazy imports for demonstration
 const LazyExample = lazy(() => import('../pages/LazyExample'));
 
@@ -184,6 +188,29 @@ const AppRoutes: React.FC = () => {
             <ProtectedRoute requiredRoles={['admin']}>
               <MainLayout>
                 <SettingsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Profile & Notification Routes - Accessible to all authenticated users */}
+        <Route
+          path={ROUTES.MY_PROFILE}
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <MyProfilePage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.NOTIFICATIONS}
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <NotificationsPage />
               </MainLayout>
             </ProtectedRoute>
           }

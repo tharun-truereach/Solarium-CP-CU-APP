@@ -8,6 +8,7 @@ export { default as AppTextField } from './AppTextField';
 export { default as AppCard } from './AppCard';
 export { default as AppConfirmDialog } from './AppConfirmDialog';
 export { default as AppToast } from './AppToast';
+export { default as NotificationBadge } from './NotificationBadge';
 
 export type { AppButtonProps } from './AppButton';
 export type { AppModalProps } from './AppModal';

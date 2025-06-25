@@ -5,9 +5,16 @@
 import { setupWorker } from 'msw';
 import { authMockHandlers } from './authMockApi';
 import { dashboardMockHandlers } from './dashboardApi';
+import { profileMockHandlers } from './profileMockApi';
+import { settingsMockHandlers } from './settingsMockApi';
 
 // Combine all mock handlers
-const handlers = [...authMockHandlers, ...dashboardMockHandlers];
+const handlers = [
+  ...authMockHandlers,
+  ...dashboardMockHandlers,
+  ...profileMockHandlers,
+  ...settingsMockHandlers,
+];
 
 // Setup the worker
 export const worker = setupWorker(...handlers);

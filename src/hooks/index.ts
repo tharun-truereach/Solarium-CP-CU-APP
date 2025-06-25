@@ -13,11 +13,13 @@ export {
   useDashboardMetricsByRole,
 } from './useDashboardMetrics';
 export { useAuditLogs } from './useAuditLogs';
+export { useMyProfile } from './useMyProfile';
 
 // Export types
 export type {
   UseDashboardMetricsReturn,
   UseDashboardMetricsOptions,
 } from './useDashboardMetrics';
+export type { UseMyProfileReturn, ProfileField } from './useMyProfile';
 
 export { useAppDispatch, useAppSelector } from '../store/hooks';

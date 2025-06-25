@@ -60,7 +60,7 @@ const App: React.FC = () => {
                   <Suspense fallback={<PersistenceLoadingComponent />}>
                     <BrowserRouter>
                       <HttpClientInitializer>
-                        <EnvironmentBanner />
+                        {/* <EnvironmentBanner /> */}
                         <AppRoutes />
                         <GlobalLoading />
                         <SessionTimeout
