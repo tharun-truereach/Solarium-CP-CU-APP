@@ -32,3 +32,6 @@ export {
   ErrorFallback,
   GlobalErrorHandler,
 } from '../components/error';
+
+// Add this line to existing exports
+export * from './leads';

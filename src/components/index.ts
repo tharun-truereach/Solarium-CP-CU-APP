@@ -55,4 +55,7 @@ export {
   FeatureFlagDebugger,
 } from '../contexts/FeatureFlagContext';
 
+// Lead components
+export * from './lead';
+
 console.log('📦 Components barrel loaded');

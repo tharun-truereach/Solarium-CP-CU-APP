@@ -33,6 +33,9 @@ export type {
   PasswordChangeResponse,
 } from './profile.types';
 
+// Lead types
+export * from './lead.types';
+
 // Common/shared types (to be implemented in future tasks)
 // export * from './common';
 // export * from './api';

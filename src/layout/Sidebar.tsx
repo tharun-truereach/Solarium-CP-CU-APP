@@ -63,8 +63,8 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: 'leads',
-    label: 'Leads',
-    icon: <People />,
+    label: 'Leads Management',
+    icon: <Assignment />,
     path: ROUTES.LEADS,
     allowedRoles: ['admin', 'kam'],
   },

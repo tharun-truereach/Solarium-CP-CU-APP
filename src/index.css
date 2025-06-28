@@ -69,3 +69,43 @@ code {
     text-shadow: none !important;
   }
 }
+
+/* Lead page animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.leads-page {
+  /* Custom styles for leads page */
+}
+
+/* Lead grid responsive styles */
+@media (max-width: 768px) {
+  .leads-page .MuiTableContainer-root {
+    overflow-x: auto;
+  }
+
+  .leads-page .MuiTableCell-root {
+    padding: 8px 4px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Lead filter animations */
+.lead-filters-expand {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Selection highlight */
+.lead-row-selected {
+  background-color: rgba(25, 118, 210, 0.08) !important;
+}
+
+.lead-row-selected:hover {
+  background-color: rgba(25, 118, 210, 0.12) !important;
+}

@@ -31,6 +31,8 @@ import NotificationsPage from '../pages/NotificationsPage';
 
 // Lazy imports for demonstration
 const LazyExample = lazy(() => import('../pages/LazyExample'));
+// Lead management pages
+const LeadsPage = lazy(() => import('../pages/leads/LeadsPage'));
 
 // Enhanced loading component for route transitions
 const RouteLoading: React.FC = () => (
@@ -82,6 +84,18 @@ const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Leads Management */}
+        <Route
+          path={ROUTES.LEADS}
+          element={
+            <ProtectedRoute requiredRoles={['admin', 'kam']}>
+              <MainLayout>
+                <LeadsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Example lazy-loaded route */}
         <Route
           path="/lazy-example"
@@ -93,19 +107,6 @@ const AppRoutes: React.FC = () => {
         />
 
         {/* Future protected routes (placeholders) */}
-        <Route
-          path={ROUTES.LEADS}
-          element={
-            <ProtectedRoute requiredRoles={['admin', 'kam']}>
-              <MainLayout>
-                <div className="placeholder-page">
-                  <h1>Leads Management</h1>
-                  <p>This page will be implemented in future tasks.</p>
-                </div>
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
 
         <Route
           path={ROUTES.QUOTATIONS}

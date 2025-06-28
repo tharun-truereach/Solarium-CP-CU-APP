@@ -3,6 +3,7 @@
  * Enhanced with environment configuration and build information
  */
 import React, { Suspense } from 'react';
+import { initializeForbiddenHandler } from './utils/forbiddenHandler';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -45,6 +46,11 @@ const HttpClientInitializer: React.FC<{ children: React.ReactNode }> = ({
 };
 
 const App: React.FC = () => {
+  // Initialize global 403 error handler
+  React.useEffect(() => {
+    initializeForbiddenHandler();
+  }, []);
+
   return (
     <ErrorBoundary>
       <Provider store={store}>

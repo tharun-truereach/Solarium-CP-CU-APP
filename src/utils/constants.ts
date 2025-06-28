@@ -38,29 +38,27 @@ export const PAGINATION = {
 // Lead management constants
 export const LEAD_CONFIG = {
   STATUSES: {
-    NEW: 'new',
-    IN_DISCUSSION: 'in_discussion',
-    PHYSICAL_MEETING_ASSIGNED: 'physical_meeting_assigned',
-    CUSTOMER_ACCEPTED: 'customer_accepted',
-    WON: 'won',
-    PENDING_AT_SOLARIUM: 'pending_at_solarium',
-    UNDER_EXECUTION: 'under_execution',
-    EXECUTED: 'executed',
-    NOT_RESPONDING: 'not_responding',
-    NOT_INTERESTED: 'not_interested',
-    OTHER_TERRITORY: 'other_territory',
+    NEW_LEAD: 'New Lead',
+    IN_DISCUSSION: 'In Discussion',
+    PHYSICAL_MEETING_ASSIGNED: 'Physical Meeting Assigned',
+    CUSTOMER_ACCEPTED: 'Customer Accepted',
+    WON: 'Won',
+    PENDING_AT_SOLARIUM: 'Pending at Solarium',
+    UNDER_EXECUTION: 'Under Execution',
+    EXECUTED: 'Executed',
+    NOT_RESPONDING: 'Not Responding',
+    NOT_INTERESTED: 'Not Interested',
+    OTHER_TERRITORY: 'Other Territory',
   },
-  SOURCES: {
-    WEBSITE: 'website',
-    REFERRAL: 'referral',
-    COLD_CALL: 'cold_call',
-    SOCIAL_MEDIA: 'social_media',
-    ADVERTISEMENT: 'advertisement',
-    TRADE_SHOW: 'trade_show',
-    PARTNER: 'partner',
+  ORIGINS: {
+    CP: 'CP',
+    CUSTOMER: 'Customer',
+    ADMIN: 'Admin',
+    KAM: 'KAM',
   },
   FOLLOW_UP_MAX_DAYS: 30,
   REMARK_MIN_LENGTH: 10,
+  BULK_SELECT_MAX: 50,
 } as const;
 
 // User roles and permissions

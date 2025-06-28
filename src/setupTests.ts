@@ -5,6 +5,12 @@
 
 import '@testing-library/jest-dom';
 import 'jest-axe/extend-expect';
+import { server } from './__mocks__/server';
+
+// Setup MSW
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 // Set up test environment variables
 process.env.REACT_APP_ENVIRONMENT = 'DEV';

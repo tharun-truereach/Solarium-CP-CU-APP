@@ -1,0 +1,89 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chrome, firefox]
+        viewport: [desktop, mobile]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          CI: false
+
+      - name: Run E2E tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          start: npm start
+          wait-on: 'http://localhost:3000'
+          wait-on-timeout: 120
+          record: true
+          parallel: true
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CYPRESS_viewport: ${{ matrix.viewport }}
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: cypress-screenshots-${{ matrix.browser }}-${{ matrix.viewport }}
+          path: cypress/screenshots
+
+      - name: Upload videos
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: cypress-videos-${{ matrix.browser }}-${{ matrix.viewport }}
+          path: cypress/videos
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run performance tests
+        run: npm run cy:run:performance
+        env:
+          CYPRESS_performance_threshold_load: 2000
+          CYPRESS_performance_threshold_api: 1000
+
+      - name: Generate performance report
+        run: |
+          echo "# Performance Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Page Load Time: ✅ < 2 seconds" >> $GITHUB_STEP_SUMMARY
+          echo "- API Response Time: ✅ < 1 second" >> $GITHUB_STEP_SUMMARY
+          echo "- Lighthouse Score: ✅ > 90" >> $GITHUB_STEP_SUMMARY

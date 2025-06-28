@@ -62,13 +62,27 @@ export const baseQuery: BaseQueryFn<
       });
     }
 
+    // Build final URL with parameters if provided
+    let finalUrl = url;
+    if (params && typeof params === 'object') {
+      const urlParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          urlParams.append(key, String(value));
+        }
+      });
+      const paramString = urlParams.toString();
+      if (paramString) {
+        finalUrl = `${url}${url.includes('?') ? '&' : '?'}${paramString}`;
+      }
+    }
+
     // Make request using shared Axios instance
     // All interceptors (auth, retry, circuit breaker) are handled by the shared instance
     const result = await axiosInstance({
-      url,
+      url: finalUrl,
       method,
       data,
-      params,
       headers,
     });
 
