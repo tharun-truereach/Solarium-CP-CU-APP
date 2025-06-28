@@ -39,6 +39,7 @@ import { LoadingSpinner } from '../loading';
 import type { Lead } from '../../types/lead.types';
 import { LeadStatusCell } from './LeadStatusCell';
 import { LeadTimelineDrawer } from './LeadTimelineDrawer';
+import { BulkActionToolbar } from './BulkActionToolbar';
 
 /**
  * Lead grid props interface
@@ -65,6 +66,10 @@ export interface LeadGridProps {
   onRefresh?: () => void;
   enableVirtualization?: boolean;
   height?: number;
+  // New bulk action props
+  onBulkUpdateStatus?: () => void;
+  onBulkReassign?: () => void;
+  onBulkExport?: () => void;
 }
 
 /**
@@ -164,6 +169,10 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
   onRefresh,
   enableVirtualization = false,
   height = 600,
+  // New bulk action props
+  onBulkUpdateStatus,
+  onBulkReassign,
+  onBulkExport,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -305,6 +314,7 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
   // Handle select all checkbox
   const handleSelectAll = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
+      event.stopPropagation();
       onSelectAll(event.target.checked);
     },
     [onSelectAll]
@@ -437,6 +447,17 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
 
   return (
     <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+      {/* Bulk Action Toolbar */}
+      <BulkActionToolbar
+        selectedLeadIds={selectedLeads}
+        totalLeadsCount={total}
+        currentFilters={{}}
+        onUpdateStatus={() => onBulkUpdateStatus?.()}
+        onReassign={() => onBulkReassign?.()}
+        onClear={() => onSelectAll(false)}
+        disabled={loading}
+      />
+
       <TableContainer sx={{ maxHeight: shouldVirtualize ? height : 'none' }}>
         <Table
           stickyHeader
@@ -526,10 +547,11 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                             return (
                               <TableCell key={column.id} align={column.align}>
                                 <Checkbox
-                                  checked={isSelected}
-                                  onChange={onRowSelect(lead.id)}
+                                  checked={selectedLeads.includes(lead.id)}
+                                  onChange={handleRowSelect(lead.id)}
+                                  onClick={e => e.stopPropagation()}
                                   inputProps={{
-                                    'aria-labelledby': `lead-${lead.id}`,
+                                    'aria-label': `select lead ${lead.leadId}`,
                                   }}
                                 />
                               </TableCell>
@@ -638,10 +660,11 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                         return (
                           <TableCell key={column.id} align={column.align}>
                             <Checkbox
-                              checked={isSelected}
+                              checked={selectedLeads.includes(lead.id)}
                               onChange={handleRowSelect(lead.id)}
+                              onClick={e => e.stopPropagation()}
                               inputProps={{
-                                'aria-labelledby': `lead-${lead.id}`,
+                                'aria-label': `select lead ${lead.leadId}`,
                               }}
                             />
                           </TableCell>

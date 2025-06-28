@@ -402,3 +402,58 @@ For technical support or questions:
 - 🟢 Production: https://app.solarium.com
 - 🟡 Staging: https://staging.solarium.com  
 - 🔵 Development: http://localhost:3000
+
+## Lead Bulk Actions & CSV Import/Export
+
+### New Features (v1.1.0)
+
+The application now supports comprehensive bulk operations for lead management:
+
+#### Bulk Operations
+- **Bulk Status Updates**: Update up to 50 leads simultaneously
+- **Bulk Reassignment**: Reassign multiple leads to different Channel Partners
+- **Smart Validation**: Real-time validation with detailed error reporting
+- **Result Tracking**: Comprehensive success/failure reporting with retry options
+
+#### CSV Import/Export
+- **CSV Import**: Import new leads from CSV files with validation
+- **CSV Export**: Export leads with applied filters to CSV format
+- **Template Support**: Download CSV templates for consistent data format
+- **50-Row Limit**: Performance-optimized with 50-row maximum per import
+
+#### Key Constraints
+- **Maximum 50 leads** per bulk operation
+- **All-or-nothing import**: Complete validation required before import
+- **10MB file size limit** for CSV uploads
+- **Admin-only import**: CSV import restricted to Administrator role
+
+### API Endpoints Added
+
+```typescript
+// Bulk Operations
+PATCH /api/v1/leads/bulk              // Bulk status update
+PATCH /api/v1/leads/bulk-reassign     // Bulk reassignment
+POST  /api/v1/leads/import            // CSV import
+GET   /api/v1/leads/export            // CSV export
+```
+
+### Usage Examples
+
+```typescript
+// Bulk status update
+const result = await bulkUpdateLeads({
+  leadIds: ['LEAD-001', 'LEAD-002'],
+  updates: {
+    status: 'In Discussion',
+    remarks: 'Bulk update via admin panel'
+  }
+});
+
+// CSV export with filters
+const csvBlob = await exportLeads({
+  filters: { status: 'New Lead', state: 'Maharashtra' },
+  format: 'csv'
+});
+```
+
+See [docs/LEADS_BULK.md](docs/LEADS_BULK.md) for complete user guide.

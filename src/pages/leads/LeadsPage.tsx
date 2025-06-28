@@ -3,7 +3,7 @@
  * Combines lead grid, filters, and timeline drawer for comprehensive lead management
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -14,6 +14,7 @@ import {
   Chip,
   useTheme,
   useMediaQuery,
+  CircularProgress,
 } from '@mui/material';
 import {
   Assignment as LeadIcon,
@@ -23,15 +24,25 @@ import {
   GetApp as ExportIcon,
   ViewList as ListIcon,
   ViewModule as GridIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLeadsTable } from '../../hooks/useLeadsTable';
 import { useLeadAccess } from '../../hooks/useLeadAccess';
-import { LeadFilters } from '../../components/lead/LeadFilters';
-import { LeadGrid } from '../../components/lead/LeadGrid';
-import { LeadTimelineDrawer } from '../../components/lead/LeadTimelineDrawer';
+import { useToast } from '../../hooks/useToast';
+import {
+  LeadFilters,
+  LeadGrid,
+  LeadTimelineDrawer,
+} from '../../components/lead';
+import { BulkActionToolbar } from '../../components/lead/BulkActionToolbar';
+import { BulkStatusDialog } from '../../components/lead/BulkStatusDialog';
+import { BulkReassignDialog } from '../../components/lead/BulkReassignDialog';
+import { CSVImportDialog } from '../../components/lead/CSVImportDialog';
 import { SkeletonLoader } from '../../components/loading';
 import { ROUTES } from '../../routes/routes';
+import { LEAD_CONFIG } from '../../utils/constants';
+import { useCSVExport } from '../../hooks/useCSVExport';
 
 /**
  * Lead capabilities hook for access control
@@ -45,6 +56,7 @@ const useLeadCapabilities = () => {
     canManageAllLeads: isAdmin,
     hasTerritoryRestrictions: !isAdmin && userTerritories.length > 0,
     role: isAdmin ? 'admin' : isKAM ? 'kam' : 'cp',
+    canAccessLead: useLeadAccess().canAccessLead,
   };
 };
 
@@ -154,13 +166,14 @@ const LeadsPage: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user } = useAuth();
 
-  // Lead capabilities
+  // Lead capabilities and access control
   const {
     canViewLeads,
     canCreateLeads,
     canManageAllLeads,
     hasTerritoryRestrictions,
     role,
+    canAccessLead,
   } = useLeadCapabilities();
 
   // Table state management
@@ -177,13 +190,10 @@ const LeadsPage: React.FC = () => {
     page,
     pageSize,
     totalPages,
-    selectedLeads,
     setFilters,
     setSorting,
     setPage,
     setPageSize,
-    selectLead,
-    selectAll,
     clearFilters,
     refresh,
     isEmpty,
@@ -197,6 +207,27 @@ const LeadsPage: React.FC = () => {
   const [selectedLeadForTimeline, setSelectedLeadForTimeline] = useState<
     string | null
   >(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false);
+  const [bulkReassignDialogOpen, setBulkReassignDialogOpen] = useState(false);
+  const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
+
+  // Effect to clear selection when page changes
+  useEffect(() => {
+    setSelectedLeadIds([]);
+  }, [page, pageSize, sortBy, sortOrder, filters]);
+
+  // Toast notifications
+  const { showError, showSuccess, showWarning } = useToast();
+
+  // CSV Export
+  const { exportLeads, isExporting } = useCSVExport();
+
+  // Memoize current filters for export
+  const currentFiltersForExport = useMemo(() => {
+    const { offset, limit, ...exportFilters } = filters;
+    return exportFilters;
+  }, [filters]);
 
   // Access control check
   if (!user || !canViewLeads) {
@@ -226,23 +257,162 @@ const LeadsPage: React.FC = () => {
   /**
    * Handle lead export
    */
-  const handleExportLeads = useCallback(() => {
-    console.log('Export leads with current filters:', filters);
-    // TODO: Implement CSV export functionality
-  }, [filters]);
+  const handleExportLeads = useCallback(async () => {
+    try {
+      await exportLeads(filters, {
+        format: 'csv',
+        filename: `${LEAD_CONFIG.EXPORT_FILENAME_PREFIX}-${new Date().toISOString().slice(0, 10)}.csv`,
+      });
+    } catch (error: any) {
+      console.error('Export failed:', error);
+      showError(error.message || 'Failed to export leads', 'Export Failed');
+    }
+  }, [filters, exportLeads, showError]);
 
   /**
-   * Handle bulk actions
+   * Handle refresh
+   */
+  const handleRefresh = useCallback(() => {
+    refresh();
+  }, [refresh]);
+
+  /**
+   * Handle lead selection
+   */
+  const handleLeadSelect = useCallback(
+    (leadId: string, selected: boolean) => {
+      // Get the lead object
+      const lead = leads.find(l => l.id === leadId);
+      if (!lead) return;
+
+      // Check territory access
+      const accessResult = canAccessLead(lead);
+
+      if (!accessResult.hasAccess) {
+        showError(
+          `Cannot select lead: ${accessResult.message}`,
+          'Territory Access Denied'
+        );
+        return;
+      }
+
+      if (selected && selectedLeadIds.length >= 50) {
+        showError(
+          'Maximum 50 leads can be selected at once',
+          'Selection Limit'
+        );
+        return;
+      }
+      setSelectedLeadIds(prev => {
+        if (selected) {
+          return [...prev, leadId];
+        } else {
+          return prev.filter(id => id !== leadId);
+        }
+      });
+    },
+    [selectedLeadIds.length, showError, leads, canAccessLead]
+  );
+
+  /**
+   * Handle select all leads
+   */
+  const handleSelectAll = useCallback(
+    (selected: boolean) => {
+      if (selected) {
+        // Filter leads by territory access and limit to 50
+        const accessibleLeads = leads
+          .filter(lead => canAccessLead(lead).hasAccess)
+          .slice(0, 50);
+
+        if (accessibleLeads.length < leads.length) {
+          showWarning(
+            'Some leads were not selected due to territory restrictions',
+            'Limited Selection'
+          );
+        }
+
+        setSelectedLeadIds(accessibleLeads.map(lead => lead.id));
+      } else {
+        setSelectedLeadIds([]);
+      }
+    },
+    [leads, canAccessLead, showWarning]
+  );
+
+  /**
+   * Handle clear selection
+   */
+  const handleClearSelection = useCallback(() => {
+    setSelectedLeadIds([]);
+  }, []);
+
+  /**
+   * Handle sort change
+   */
+  const handleSortChange = useCallback(
+    (sortBy: string, sortOrder: 'asc' | 'desc') => {
+      setSorting(
+        sortBy as
+          | 'createdAt'
+          | 'updatedAt'
+          | 'followUpDate'
+          | 'customerName'
+          | 'status',
+        sortOrder
+      );
+    },
+    [setSorting]
+  );
+
+  /**
+   * Handle bulk status update
    */
   const handleBulkStatusUpdate = useCallback(() => {
-    console.log('Bulk update selected leads:', selectedLeads);
-    // TODO: Implement bulk status update
-  }, [selectedLeads]);
+    if (selectedLeadIds.length === 0) {
+      showError('Please select leads to update', 'No Selection');
+      return;
+    }
+    setBulkStatusDialogOpen(true);
+  }, [selectedLeadIds.length, showError]);
 
+  /**
+   * Handle bulk reassignment
+   */
   const handleBulkReassign = useCallback(() => {
-    console.log('Bulk reassign selected leads:', selectedLeads);
-    // TODO: Implement bulk reassignment
-  }, [selectedLeads]);
+    if (selectedLeadIds.length === 0) {
+      showError('Please select leads to reassign', 'No Selection');
+      return;
+    }
+    setBulkReassignDialogOpen(true);
+  }, [selectedLeadIds.length, showError]);
+
+  /**
+   * Handle CSV import
+   */
+  const handleCSVImport = useCallback(() => {
+    setCsvImportDialogOpen(true);
+  }, []);
+
+  /**
+   * Handle successful bulk operation
+   */
+  const handleBulkOperationSuccess = useCallback(
+    (successCount: number) => {
+      // Clear selection
+      handleClearSelection();
+
+      // Refresh the list
+      handleRefresh();
+
+      // Show success message
+      showSuccess(
+        `Successfully processed ${successCount} lead${successCount !== 1 ? 's' : ''}`,
+        'Operation Complete'
+      );
+    },
+    [handleClearSelection, handleRefresh, showSuccess]
+  );
 
   /**
    * Handle timeline view
@@ -256,12 +426,11 @@ const LeadsPage: React.FC = () => {
   }, []);
 
   /**
-   * Handle refresh
+   * Get selected lead objects from their IDs
    */
-  const handleRefresh = useCallback(() => {
-    refresh();
-    selectAll(false);
-  }, [refresh, selectAll]);
+  const getSelectedLeadObjects = useCallback(() => {
+    return leads?.filter(lead => selectedLeadIds.includes(lead.id)) || [];
+  }, [leads, selectedLeadIds]);
 
   return (
     <Box className="leads-page" component="main">
@@ -338,14 +507,18 @@ const LeadsPage: React.FC = () => {
               <Tooltip title="Export leads">
                 <IconButton
                   onClick={handleExportLeads}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   size="small"
                   sx={{
                     bgcolor: 'action.hover',
                     '&:hover': { bgcolor: 'action.selected' },
                   }}
                 >
-                  <ExportIcon />
+                  {isExporting ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    <ExportIcon />
+                  )}
                 </IconButton>
               </Tooltip>
             )}
@@ -428,75 +601,33 @@ const LeadsPage: React.FC = () => {
           totalCount={total}
           filteredCount={leads.length}
         />
+
+        {/* Bulk Action Toolbar */}
+        <BulkActionToolbar
+          selectedLeadIds={selectedLeadIds}
+          totalLeadsCount={total}
+          currentFilters={currentFiltersForExport}
+          onUpdateStatus={handleBulkStatusUpdate}
+          onReassign={handleBulkReassign}
+          onClear={handleClearSelection}
+          disabled={isLoading}
+        />
       </Box>
 
-      {/* Bulk Actions Toolbar */}
-      {selectedLeads.length > 0 && (
-        <Paper
-          sx={{
-            p: 2,
-            mb: 3,
-            bgcolor: 'primary.light',
-            color: 'primary.contrastText',
-            borderRadius: 2,
-          }}
+      {/* Import/Export Actions - Admin Only */}
+      {canManageAllLeads && (
+        <Box
+          sx={{ mb: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 2,
-            }}
+          <Button
+            variant="outlined"
+            onClick={handleCSVImport}
+            startIcon={<UploadIcon />}
+            sx={{ textTransform: 'none' }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                {selectedLeads.length} lead
-                {selectedLeads.length === 1 ? '' : 's'} selected
-              </Typography>
-              {selectedLeads.length >= 50 && (
-                <Chip
-                  label="Max 50"
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                />
-              )}
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleBulkStatusUpdate}
-                sx={{ color: 'inherit', borderColor: 'currentColor' }}
-              >
-                Update Status
-              </Button>
-
-              {canManageAllLeads && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleBulkReassign}
-                  sx={{ color: 'inherit', borderColor: 'currentColor' }}
-                >
-                  Reassign
-                </Button>
-              )}
-
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => selectAll(false)}
-                sx={{ color: 'inherit', borderColor: 'currentColor' }}
-              >
-                Clear
-              </Button>
-            </Box>
-          </Box>
-        </Paper>
+            Import CSV
+          </Button>
+        </Box>
       )}
 
       {/* Main Content */}
@@ -543,26 +674,30 @@ const LeadsPage: React.FC = () => {
             pageSize={pageSize}
             sortBy={sortBy}
             sortOrder={sortOrder}
-            selectedLeads={selectedLeads}
+            selectedLeads={selectedLeadIds}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
-            onSortChange={setSorting}
-            onLeadSelect={selectLead}
-            onSelectAll={selectAll}
+            onSortChange={handleSortChange}
+            onLeadSelect={handleLeadSelect}
+            onSelectAll={handleSelectAll}
             onLeadView={lead => {
               // Navigate to lead details or open modal
               console.log('View lead:', lead);
             }}
             onLeadEdit={lead => {
-              // Navigate to lead edit form or open modal
-              console.log('Edit lead:', lead);
+              // For individual edit, we can reuse the bulk status dialog with single lead
+              handleSelectAll(false);
+              handleLeadSelect(lead.id, true);
+              setBulkStatusDialogOpen(true);
             }}
             onLeadTimeline={lead => {
               setSelectedLeadForTimeline(lead.leadId);
             }}
             onLeadReassign={lead => {
-              // Open reassign dialog
-              console.log('Reassign lead:', lead);
+              // For individual reassign, we can reuse the bulk dialog with single lead
+              handleSelectAll(false);
+              handleLeadSelect(lead.id, true);
+              setBulkReassignDialogOpen(true);
             }}
             onRefresh={refresh}
             enableVirtualization={leads.length > 100}
@@ -580,6 +715,27 @@ const LeadsPage: React.FC = () => {
           onClose={handleCloseTimeline}
         />
       )}
+
+      {/* Bulk Status Dialog */}
+      <BulkStatusDialog
+        open={bulkStatusDialogOpen}
+        onClose={() => setBulkStatusDialogOpen(false)}
+        selectedLeadIds={selectedLeadIds}
+        onSuccess={handleBulkOperationSuccess}
+      />
+
+      <BulkReassignDialog
+        open={bulkReassignDialogOpen}
+        onClose={() => setBulkReassignDialogOpen(false)}
+        selectedLeadIds={selectedLeadIds}
+        onSuccess={handleBulkOperationSuccess}
+      />
+
+      <CSVImportDialog
+        open={csvImportDialogOpen}
+        onClose={() => setCsvImportDialogOpen(false)}
+        onSuccess={handleBulkOperationSuccess}
+      />
 
       {/* Development Debug Info */}
       {process.env.NODE_ENV === 'development' && (
@@ -606,7 +762,7 @@ const LeadsPage: React.FC = () => {
               <br />• Territory Restrictions:{' '}
               {hasTerritoryRestrictions ? 'Yes' : 'No'}
               <br />• Leads: {leads.length} total, {leads.length} filtered
-              <br />• Selected: {selectedLeads.length}/50
+              <br />• Selected: {selectedLeadIds.length}/50
               <br />• Auto-refresh: {isFetching ? 'Active' : 'Idle'}
             </Typography>
           </Paper>

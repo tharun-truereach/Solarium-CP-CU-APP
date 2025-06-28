@@ -232,3 +232,88 @@ export interface LeadApiError {
   field?: string;
   validationErrors?: Record<string, string[]>;
 }
+
+/**
+ * Bulk operation interfaces
+ */
+
+/**
+ * Bulk update leads payload
+ */
+export interface BulkUpdateLeadsPayload {
+  leadIds: string[]; // Max 50 IDs
+  updates: {
+    status?: LeadStatus;
+    remarks?: string;
+    followUpDate?: string;
+    quotationRef?: string;
+    tokenNumber?: string;
+  };
+}
+
+/**
+ * Bulk reassign leads payload
+ */
+export interface BulkReassignLeadsPayload {
+  leadIds: string[]; // Max 50 IDs
+  cpId: string;
+  reason?: string;
+}
+
+/**
+ * Bulk operation result for individual item
+ */
+export interface BulkOperationItem {
+  id: string;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Bulk operation response
+ */
+export interface BulkOperationResponse {
+  success: boolean;
+  data: {
+    total: number;
+    successful: number;
+    failed: number;
+    results: BulkOperationItem[];
+  };
+}
+
+/**
+ * Lead import payload
+ */
+export interface LeadImportPayload {
+  file: File;
+}
+
+/**
+ * Lead import error detail
+ */
+export interface LeadImportError {
+  row: number;
+  field: string;
+  value: any;
+  message: string;
+}
+
+/**
+ * Lead import response
+ */
+export interface LeadImportResponse {
+  success: boolean;
+  data: {
+    total: number;
+    imported: number;
+    errors: LeadImportError[];
+  };
+}
+
+/**
+ * Lead export query parameters
+ */
+export interface LeadExportQuery extends Omit<LeadQuery, 'offset' | 'limit'> {
+  format?: 'csv' | 'xlsx';
+}

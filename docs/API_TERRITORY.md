@@ -605,3 +605,132 @@ window.__TERRITORY_DEBUG__ = true;
 - Territory filtering reduces data transfer by >80% for KAM users
 - Client-side filtering is memoized for performance
 - API calls include territory headers to enable server-side optimizations 
+
+## Bulk Operations API
+
+### POST /api/v1/leads/import
+
+Import leads from CSV file with validation.
+
+**Request:**
+```
+Content-Type: multipart/form-data
+Authorization: Bearer <token>
+
+Body: FormData with 'file' field containing CSV
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "importResults": {
+      "total": 50,
+      "successful": 45,
+      "failed": 5,
+      "errors": [
+        {
+          "row": 3,
+          "field": "customerPhone", 
+          "reason": "Invalid phone format"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Territory Filtering:** None (creates leads for assignment)
+**Role Access:** Admin only
+**Rate Limits:** 5 requests per minute
+**File Limits:** 10MB, 50 rows maximum
+
+### PATCH /api/v1/leads/bulk
+
+Update multiple lead statuses simultaneously.
+
+**Request:**
+```json
+{
+  "leadIds": ["LEAD-001", "LEAD-002"],
+  "updates": {
+    "status": "In Discussion",
+    "remarks": "Bulk status update",
+    "followUpDate": "2024-02-15"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "successIds": ["LEAD-001", "LEAD-002"],
+    "failed": []
+  }
+}
+```
+
+**Territory Filtering:** Applied - KAM can only update leads in assigned territories
+**Role Access:** Admin, KAM
+**Batch Limit:** 50 leads maximum
+
+### PATCH /api/v1/leads/bulk-reassign
+
+Reassign multiple leads to different Channel Partner.
+
+**Request:**
+```json
+{
+  "leadIds": ["LEAD-001", "LEAD-002"],
+  "cpId": "CP-123",
+  "reason": "Territory restructuring"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "successIds": ["LEAD-001"],
+    "failed": [
+      {
+        "id": "LEAD-002", 
+        "reason": "Lead already assigned to this CP"
+      }
+    ]
+  }
+}
+```
+
+**Territory Filtering:** Applied - KAM restricted to assigned territories
+**Role Access:** Admin, KAM
+**Batch Limit:** 50 leads maximum
+
+### GET /api/v1/leads/export
+
+Export leads to CSV format with applied filters.
+
+**Request:**
+```
+GET /api/v1/leads/export?status=New%20Lead&state=Maharashtra&format=csv
+Authorization: Bearer <token>
+```
+
+**Response:**
+```
+Content-Type: text/csv
+Content-Disposition: attachment; filename="leads-20240201-1030.csv"
+
+leadId,customerName,customerPhone,status,createdAt
+LEAD-001,John Doe,9876543210,New Lead,2024-01-15
+```
+
+**Territory Filtering:** Applied - respects user's territory access
+**Role Access:** Admin, KAM
+**Query Parameters:**
+- `format`: csv (default) | xlsx
+- All lead filter parameters (status, state, etc.) 

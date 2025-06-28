@@ -59,6 +59,8 @@ export const LEAD_CONFIG = {
   FOLLOW_UP_MAX_DAYS: 30,
   REMARK_MIN_LENGTH: 10,
   BULK_SELECT_MAX: 50,
+  EXPORT_FILENAME_PREFIX: 'leads-export',
+  EXPORT_MAX_TIMEOUT: 30000, // 30 seconds
 } as const;
 
 // User roles and permissions

@@ -13,12 +13,7 @@ import type { LeadQuery } from '../types/lead.types';
  */
 export interface UseLeadsTableOptions {
   initialPageSize?: number;
-  initialSort?: {
-    sortBy: string;
-    sortOrder: 'asc' | 'desc';
-  };
-  enablePolling?: boolean;
-  pollingInterval?: number;
+  initialFilters?: LeadQuery;
 }
 
 /**
@@ -55,12 +50,6 @@ export interface UseLeadsTableReturn {
   clearFilters: () => void;
   refresh: () => void;
 
-  // Selection
-  selectedLeads: string[];
-  setSelectedLeads: (selected: string[]) => void;
-  selectAll: (selected: boolean) => void;
-  selectLead: (leadId: string, selected: boolean) => void;
-
   // Derived state
   hasFilters: boolean;
   isEmpty: boolean;
@@ -81,73 +70,54 @@ const defaultFilters: LeadQuery = {
 /**
  * Custom hook for leads table management
  */
-export const useLeadsTable = (
-  options: UseLeadsTableOptions = {}
-): UseLeadsTableReturn => {
-  const {
-    initialPageSize = 25,
-    initialSort = { sortBy: 'createdAt', sortOrder: 'desc' },
-    enablePolling = false,
-    pollingInterval = 30000,
-  } = options;
+export const useLeadsTable = ({
+  initialPageSize = 10,
+  initialFilters = defaultFilters,
+}: UseLeadsTableOptions = {}) => {
+  // State
+  const [pageState, setPageState] = useState(0);
+  const [pageSizeState, setPageSizeState] = useState(initialPageSize);
+  const [filtersState, setFiltersState] = useState<LeadQuery>(initialFilters);
+  const [sortByState, setSortByState] = useState<
+    'createdAt' | 'updatedAt' | 'followUpDate' | 'customerName' | 'status'
+  >('createdAt');
+  const [sortOrderState, setSortOrderState] = useState<'asc' | 'desc'>('desc');
 
-  const { filterAccessibleLeads } = useLeadAccess();
-
-  // Local state
-  const [page, setPageState] = useState(0); // MUI uses 0-based pagination
-  const [pageSize, setPageSizeState] = useState(initialPageSize);
-  const [sortBy, setSortByState] = useState(initialSort.sortBy);
-  const [sortOrder, setSortOrderState] = useState<'asc' | 'desc'>(
-    initialSort.sortOrder
-  );
-  const [filters, setFiltersState] = useState<LeadQuery>(defaultFilters);
-  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-
-  // Build query parameters
-  const queryParams = useMemo(
-    (): LeadQuery => ({
-      ...filters,
-      offset: page * pageSize,
-      limit: pageSize,
-      sortBy: sortBy as any,
-      sortOrder,
-    }),
-    [filters, page, pageSize, sortBy, sortOrder]
-  );
-
-  // Main query
-  const { data, isLoading, isFetching, isError, error, refetch } =
-    useGetLeadsQuery(queryParams, {
-      pollingInterval: enablePolling ? pollingInterval : 0,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
+  // Query
+  const { data, isLoading, isError, isFetching, error, refetch } =
+    useGetLeadsQuery({
+      offset: pageState * pageSizeState,
+      limit: pageSizeState,
+      ...filtersState,
+      sortBy: sortByState,
+      sortOrder: sortOrderState,
     });
 
-  // Extract data with client-side territory filtering as fallback
-  const leads = useMemo(() => {
-    if (!data?.data.items) return [];
-
-    // Apply client-side filtering as additional security layer
-    return filterAccessibleLeads(data.data.items);
-  }, [data?.data.items, filterAccessibleLeads]);
-
-  const total = data?.data.total || 0;
-  const totalPages = Math.ceil(total / pageSize);
+  // Extract data
+  const leads = data?.data?.items || [];
+  const total = data?.data?.total || 0;
+  const totalPages = data?.data?.totalPages || 0;
 
   // Actions
   const setPage = useCallback((newPage: number) => {
     setPageState(newPage);
-    setSelectedLeads([]); // Clear selection on page change
   }, []);
 
   const setPageSize = useCallback((newPageSize: number) => {
     setPageSizeState(newPageSize);
     setPageState(0); // Reset to first page
-    setSelectedLeads([]); // Clear selection
   }, []);
 
   const setSorting = useCallback(
-    (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
+    (
+      newSortBy:
+        | 'createdAt'
+        | 'updatedAt'
+        | 'followUpDate'
+        | 'customerName'
+        | 'status',
+      newSortOrder: 'asc' | 'desc'
+    ) => {
       setSortByState(newSortBy);
       setSortOrderState(newSortOrder);
     },
@@ -157,101 +127,58 @@ export const useLeadsTable = (
   const setFilters = useCallback((newFilters: LeadQuery) => {
     setFiltersState(newFilters);
     setPageState(0); // Reset to first page when filters change
-    setSelectedLeads([]); // Clear selection
   }, []);
 
   const clearFilters = useCallback(() => {
     setFiltersState(defaultFilters);
     setPageState(0);
-    setSelectedLeads([]);
   }, []);
 
   const refresh = useCallback(() => {
     refetch();
   }, [refetch]);
 
-  // Selection management
-  const selectAll = useCallback(
-    (selected: boolean) => {
-      if (selected) {
-        setSelectedLeads(leads.map(lead => lead.id));
-      } else {
-        setSelectedLeads([]);
-      }
-    },
-    [leads]
-  );
-
-  const selectLead = useCallback((leadId: string, selected: boolean) => {
-    setSelectedLeads(prev => {
-      if (selected) {
-        return [...prev, leadId];
-      } else {
-        return prev.filter(id => id !== leadId);
-      }
-    });
-  }, []);
-
   // Derived state
   const hasFilters = useMemo(() => {
     return Boolean(
-      filters.search ||
-        filters.status ||
-        filters.origin ||
-        filters.territory ||
-        filters.state ||
-        filters.assignedCP ||
-        filters.dateFrom ||
-        filters.dateTo ||
-        filters.followUpDateFrom ||
-        filters.followUpDateTo
+      filtersState.search ||
+        filtersState.status ||
+        filtersState.origin ||
+        filtersState.territory ||
+        filtersState.state ||
+        filtersState.assignedCP ||
+        filtersState.dateFrom ||
+        filtersState.dateTo ||
+        filtersState.followUpDateFrom ||
+        filtersState.followUpDateTo
     );
-  }, [filters]);
+  }, [filtersState]);
 
   const isEmpty = leads.length === 0 && !isLoading;
-  const hasNextPage = page < totalPages - 1;
-  const hasPreviousPage = page > 0;
+  const hasNextPage = pageState < totalPages - 1;
+  const hasPreviousPage = pageState > 0;
 
   return {
-    // Data
     leads,
     total,
-
-    // Loading states
     isLoading,
-    isFetching,
     isError,
+    isFetching,
     error,
-
-    // Pagination
-    page,
-    pageSize,
+    filters: filtersState,
+    sortBy: sortByState,
+    sortOrder: sortOrderState,
+    page: pageState,
+    pageSize: pageSizeState,
     totalPages,
-
-    // Sorting
-    sortBy,
-    sortOrder,
-
-    // Filtering
-    filters,
-
-    // Actions
+    setFilters,
+    setSorting,
     setPage,
     setPageSize,
-    setSorting,
-    setFilters,
     clearFilters,
     refresh,
-
-    // Selection
-    selectedLeads,
-    setSelectedLeads,
-    selectAll,
-    selectLead,
-
-    // Derived state
-    hasFilters,
     isEmpty,
+    hasFilters,
     hasNextPage,
     hasPreviousPage,
   };

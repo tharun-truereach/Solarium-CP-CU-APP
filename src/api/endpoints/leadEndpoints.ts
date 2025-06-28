@@ -15,6 +15,13 @@ import type {
   LeadReassignPayload,
   LeadTimelineResponse,
   LeadApiError,
+  // Add new bulk operation types
+  BulkUpdateLeadsPayload,
+  BulkReassignLeadsPayload,
+  BulkOperationResponse,
+  LeadImportPayload,
+  LeadImportResponse,
+  LeadExportQuery,
 } from '../../types/lead.types';
 
 /**
@@ -432,6 +439,246 @@ export const leadEndpoints = apiSlice.injectEndpoints({
         };
       },
     }),
+
+    /**
+     * Bulk update multiple leads status/details
+     * Maximum 50 leads per request
+     */
+    bulkUpdateLeads: builder.mutation<
+      BulkOperationResponse,
+      BulkUpdateLeadsPayload
+    >({
+      query: ({ leadIds, updates }) => {
+        // Client-side validation for max 50 IDs
+        if (leadIds.length > 50) {
+          throw new Error('Cannot update more than 50 leads at once');
+        }
+
+        return {
+          url: '/api/v1/leads/bulk',
+          method: 'PATCH',
+          data: { leadIds, updates },
+        };
+      },
+      invalidatesTags: ['Lead'],
+      transformResponse: (response: { success: boolean; data: any }) => {
+        console.log('✅ Bulk lead update completed:', {
+          total: response.data.total,
+          successful: response.data.successful,
+          failed: response.data.failed,
+        });
+        return response as BulkOperationResponse;
+      },
+      transformErrorResponse: (response: any): LeadApiError => {
+        console.error(
+          '❌ Bulk lead update failed:',
+          response.status,
+          response.data?.message
+        );
+
+        // Handle 403 Forbidden responses
+        if (response.status === 403) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('api:forbidden', {
+                detail: {
+                  endpoint: '/api/v1/leads/bulk',
+                  error: response,
+                  message:
+                    response.data?.message || 'Access denied for bulk update',
+                },
+              })
+            );
+          }
+        }
+
+        return {
+          status: response.status,
+          message: response.data?.message || 'Failed to update leads in bulk',
+          field: response.data?.field,
+          validationErrors: response.data?.validationErrors,
+        };
+      },
+    }),
+
+    /**
+     * Bulk reassign multiple leads to different Channel Partner
+     * Maximum 50 leads per request
+     */
+    bulkReassignLeads: builder.mutation<
+      BulkOperationResponse,
+      BulkReassignLeadsPayload
+    >({
+      query: ({ leadIds, cpId, reason }) => {
+        // Client-side validation for max 50 IDs
+        if (leadIds.length > 50) {
+          throw new Error('Cannot reassign more than 50 leads at once');
+        }
+
+        return {
+          url: '/api/v1/leads/bulk-reassign',
+          method: 'PATCH',
+          data: { leadIds, cpId, reason },
+        };
+      },
+      invalidatesTags: ['Lead'],
+      transformResponse: (response: { success: boolean; data: any }) => {
+        console.log('✅ Bulk lead reassignment completed:', {
+          total: response.data.total,
+          successful: response.data.successful,
+          failed: response.data.failed,
+        });
+        return response as BulkOperationResponse;
+      },
+      transformErrorResponse: (response: any): LeadApiError => {
+        console.error(
+          '❌ Bulk lead reassignment failed:',
+          response.status,
+          response.data?.message
+        );
+
+        // Handle 403 Forbidden responses
+        if (response.status === 403) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('api:forbidden', {
+                detail: {
+                  endpoint: '/api/v1/leads/bulk-reassign',
+                  error: response,
+                  message:
+                    response.data?.message ||
+                    'Access denied for bulk reassignment',
+                },
+              })
+            );
+          }
+        }
+
+        return {
+          status: response.status,
+          message: response.data?.message || 'Failed to reassign leads in bulk',
+          field: response.data?.field,
+          validationErrors: response.data?.validationErrors,
+        };
+      },
+    }),
+
+    /**
+     * Import leads from CSV file
+     * All-or-nothing import: returns 200 only when all rows are valid
+     * Maximum 50 rows per import
+     */
+    importLeads: builder.mutation<LeadImportResponse, LeadImportPayload>({
+      query: ({ file }) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        return {
+          url: '/api/v1/leads/import',
+          method: 'POST',
+          data: formData,
+          headers: {
+            // Let browser set Content-Type for FormData
+          },
+        };
+      },
+      invalidatesTags: ['Lead'],
+      transformResponse: (response: { success: boolean; data: any }) => {
+        console.log('✅ Lead import completed:', {
+          total: response.data.total,
+          imported: response.data.imported,
+          errors: response.data.errors?.length || 0,
+        });
+        return response as LeadImportResponse;
+      },
+      transformErrorResponse: (response: any): LeadApiError => {
+        console.error(
+          '❌ Lead import failed:',
+          response.status,
+          response.data?.message
+        );
+
+        return {
+          status: response.status,
+          message: response.data?.message || 'Failed to import leads',
+          field: response.data?.field,
+          validationErrors: response.data?.validationErrors,
+        };
+      },
+    }),
+
+    /**
+     * Export leads to CSV based on current filters
+     * Returns CSV blob for download
+     */
+    exportLeads: builder.query<Blob, LeadExportQuery>({
+      query: (params = {}) => {
+        // Build query parameters from filters
+        const queryParams: Record<string, string> = {};
+
+        if (params.status) queryParams.status = params.status;
+        if (params.origin) queryParams.origin = params.origin;
+        if (params.source) queryParams.source = params.source;
+        if (params.assignedCP) queryParams.assignedCP = params.assignedCP;
+        if (params.territory) queryParams.territory = params.territory;
+        if (params.state) queryParams.state = params.state;
+        if (params.dateFrom) queryParams.dateFrom = params.dateFrom;
+        if (params.dateTo) queryParams.dateTo = params.dateTo;
+        if (params.followUpDateFrom)
+          queryParams.followUpDateFrom = params.followUpDateFrom;
+        if (params.followUpDateTo)
+          queryParams.followUpDateTo = params.followUpDateTo;
+        if (params.search) queryParams.search = params.search;
+        if (params.customerName) queryParams.customerName = params.customerName;
+        if (params.customerPhone)
+          queryParams.customerPhone = params.customerPhone;
+        if (params.format) queryParams.format = params.format;
+
+        return {
+          url: '/api/v1/leads/export',
+          method: 'GET',
+          params: queryParams,
+          responseType: 'blob',
+        };
+      },
+      // Don't cache export results
+      keepUnusedDataFor: 0,
+      transformResponse: (response: Blob) => {
+        console.log('✅ Lead export completed:', {
+          size: response.size,
+          type: response.type,
+        });
+        return response;
+      },
+      transformErrorResponse: (response: any): LeadApiError => {
+        console.error(
+          '❌ Lead export failed:',
+          response.status,
+          response.data?.message
+        );
+
+        // Handle 403 Forbidden responses
+        if (response.status === 403) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('api:forbidden', {
+                detail: {
+                  endpoint: '/api/v1/leads/export',
+                  error: response,
+                  message:
+                    response.data?.message || 'Access denied for lead export',
+                },
+              })
+            );
+          }
+        }
+
+        return {
+          status: response.status,
+          message: response.data?.message || 'Failed to export leads',
+        };
+      },
+    }),
   }),
   overrideExisting: true,
 });
@@ -446,6 +693,11 @@ export const {
   useUpdateLeadStatusMutation,
   useReassignLeadMutation,
   useGetLeadTimelineQuery,
+  // New bulk operation hooks
+  useBulkUpdateLeadsMutation,
+  useBulkReassignLeadsMutation,
+  useImportLeadsMutation,
+  useExportLeadsQuery,
 } = leadEndpoints;
 
 /**

@@ -10,6 +10,7 @@ import type {
   LeadListResponse,
   LeadTimelineResponse,
 } from '../types/lead.types';
+import { CSVToolkit } from '../services/csv/csvToolkit';
 
 /**
  * Sample lead data
@@ -593,6 +594,21 @@ export const leadMockHandlers = [
         success: true,
         data: newLead,
       })
+    );
+  }),
+
+  // Export leads
+  rest.get('*/api/v1/leads/export', (req, res, ctx) => {
+    console.log('📥 Mock API: GET /api/v1/leads/export');
+
+    // Generate CSV content from mock leads
+    const csvContent = CSVToolkit.exportToCSV(mockLeads);
+
+    // Return CSV file
+    return res(
+      ctx.set('Content-Type', 'text/csv'),
+      ctx.set('Content-Disposition', 'attachment; filename="leads-export.csv"'),
+      ctx.body(csvContent)
     );
   }),
 
